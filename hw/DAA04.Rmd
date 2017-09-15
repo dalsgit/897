@@ -2,7 +2,7 @@
 title: "Stat 897 Spring 2017 Data Analysis Assignment 4"
 author: "Penn State"
 date: "Due September 17, 2017"
-output: pdf_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +24,6 @@ data("College")
 ```{r}
 set.seed (1)
 trainingRows=sample (nrow(College), 100)
-#train=sample (c(TRUE ,FALSE), nrow(College),rep=TRUE)
 test = College[-trainingRows,]
 train = College[trainingRows,]
 ```
@@ -33,32 +32,43 @@ train = College[trainingRows,]
 ### (c) Perform best subset selection on the training set, and plot the training set MSE associated with the best model of each size.
 
 ```{r}
-regfit.best=regsubsets (Apps~.,data=train, nvmax =17)
-test.mat=model.matrix (Apps~.,data=test)
-val.errors =rep(NA ,17)
-for(i in 1:17){
+dim(train)
+names(train)
+regfit.best=regsubsets (Apps~.,data=train, nvmax=17)
+train.mat=model.matrix (Apps~.,data=train)
+train.val.errors =rep(NA ,17) 
+for(i in 1:17) {
 	coefi=coef(regfit.best ,id=i)
-  print('For: '+coefi)
-	pred=test.mat [,names(coefi)]%*% coefi
-	val.errors [i]= mean(( test$Apps-pred)^2)
+  	pred=train.mat [,names(coefi)]%*% coefi
+	train.val.errors [i]= mean(( train$Apps-pred)^2)
 }
-
+plot(train.val.errors ,type='b', xlab='# of parameters', ylab='Training MSE')
 
 ```
+
+We can see that the training MSE continues to decrease but the rate of change drops significantly after the first few terms. This behavior is expected and is the reason why we can't use the training MSE to compare between models of different sizes.
 
 ### (d) Plot the test set MSE associated with the best model of each size.
 
 ```{r}
-plot(val.errors ,type='b')
+test.mat=model.matrix (Apps~.,data=test)
+test.val.errors =rep(NA ,17)
+for(i in 1:17){
+	coefi=coef(regfit.best ,id=i)
+	pred=test.mat [,names(coefi)] %*% coefi
+	test.val.errors [i]= mean(( test$Apps-pred)^2)
+}
+plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
 
 ```
 
 ### (e) For which model size does the test set MSE take on its minimum value? Comment on your results.
 
 ```{r}
-which.min(val.errors)
+which.min(test.val.errors)
 ```
-The test set MSE takes on the minimum value for model 11. 
+The test set MSE takes on the minimum value for model 11. As we discussed before We can see that the training MSE continues to decrease but the rate of change drops significantly after the first few terms. On the other hand the test MSE first drops and then starts to increase indicating overfitting when the number of parameters is >= 12. Also when the parameters are < 11 we see indications of underfitting.
+
 
 Please check that none of the best models is the intercept only model,  or the model with ALL predictors. If they are, try using a different seed value to avoid it.
 
@@ -68,6 +78,41 @@ $$
 $$
 for a range of values of r. Comment on what you observe. How does this plot compare to the test MSE plot from (d).
 
+```{r}
+dim(College)
+lm.fit=lm(Apps~., data=College)
+beta_j = coef(lm.fit)
+beta_j
+
+sqrt_sum_beta_deltas_squared=rep(NA ,17)
+for(i in 1:17){
+  beta_hat_j=coef(regfit.best ,id=i)
+  beta_j[names(beta_j)]
+  beta_hat_j[names(beta_j)]
+  sqrt_sum_beta_deltas_squared [i]= sqrt(sum((beta_j[names(beta_j)] - beta_hat_j[names(beta_j)])^2, na.rm = TRUE))
+}
+
+plot(sqrt_sum_beta_deltas_squared, type='b')
+```
+
+```{r}
+which.max(sqrt_sum_beta_deltas_squared)
+```
+
+The max of the sum of beta delta is at 11 which is the same as where we 
 
 ### (g) Now use forward and backward stepwise selection with the BIC and AIC to select models (so you will get up to four best models).  How do the results compare to what you obtained above in part (c) and (d)?
 
+```{r}
+regfit.fwd=regsubsets (Apps~.,data=train, nvmax =17, method='forward')
+reg.summary = summary (regfit.fwd)
+reg.summary 
+which.min (reg.summary$bic )
+which.min (reg.summary$aic )
+```
+
+```{r}
+regfit.bwd=regsubsets (Apps~.,data=train, nvmax =17, method='backward')
+reg.summary =  (regfit.bwd)
+
+```

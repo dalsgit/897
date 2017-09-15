@@ -4,7 +4,7 @@ library(MASS)
 library(stats)
 library(boot)
 library (ISLR)
-
+library(leaps)
 Advertising = read.csv("Advertising.csv")
 lm.fit =lm(Sales~TV, data = Advertising)
 confint (lm.fit, level = 0.95)
