@@ -2,7 +2,9 @@
 title: "Stat 897 Spring 2017 Data Analysis Assignment 4"
 author: "Penn State"
 date: "Due September 17, 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ### (a) Load the dataset College. Our objective is to predict the number of applications received using the other variables in the data set.
 
 ```{r}
+library(leaps)
 library(ISLR)
 data("College")
 ```
@@ -23,9 +26,9 @@ data("College")
 
 ```{r}
 set.seed (1)
-trainingRows=sample (nrow(College), 100)
-test = College[-trainingRows,]
+trainingRows=sample (nrow(College), 100, replace = FALSE)
 train = College[trainingRows,]
+test = College[-trainingRows,]
 ```
 
 
@@ -47,6 +50,7 @@ plot(train.val.errors ,type='b', xlab='# of parameters', ylab='Training MSE')
 ```
 
 We can see that the training MSE continues to decrease but the rate of change drops significantly after the first few terms. This behavior is expected and is the reason why we can't use the training MSE to compare between models of different sizes.
+Looking at how steep is the decrease - the steepest decrease happens till 5 and after 11 is almost flat.
 
 ### (d) Plot the test set MSE associated with the best model of each size.
 
@@ -61,6 +65,8 @@ for(i in 1:17){
 plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
 
 ```
+
+The minimum test MSE if for model with 11 parameters
 
 ### (e) For which model size does the test set MSE take on its minimum value? Comment on your results.
 
@@ -81,38 +87,54 @@ for a range of values of r. Comment on what you observe. How does this plot comp
 ```{r}
 dim(College)
 lm.fit=lm(Apps~., data=College)
+regfit.best=regsubsets (Apps~.,data=College, nvmax=17)
 beta_j = coef(lm.fit)
 beta_j
 
 sqrt_sum_beta_deltas_squared=rep(NA ,17)
 for(i in 1:17){
   beta_hat_j=coef(regfit.best ,id=i)
-  beta_j[names(beta_j)]
-  beta_hat_j[names(beta_j)]
-  sqrt_sum_beta_deltas_squared [i]= sqrt(sum((beta_j[names(beta_j)] - beta_hat_j[names(beta_j)])^2, na.rm = TRUE))
+  sqrt_sum_beta_deltas_squared [i] = sqrt(sum(
+    (beta_j[names(beta_j)] - beta_hat_j[names(beta_j)])^2, 
+             na.rm = TRUE))  
 }
 
-plot(sqrt_sum_beta_deltas_squared, type='b')
+plot(sqrt_sum_beta_deltas_squared, xlab ="Number of Variables", type = 'b')  
 ```
 
 ```{r}
-which.max(sqrt_sum_beta_deltas_squared)
+which.min(sqrt_sum_beta_deltas_squared)
 ```
 
-The max of the sum of beta delta is at 11 which is the same as where we 
+We see that as more terms are added to the best model, additional terms are added to the equation - we observe high volatility in the initial part of the plot. As we reach towards the max the volatility subsides and the value rapidly moves towards 0. At 17 parameters we get 0 as expected. 
 
 ### (g) Now use forward and backward stepwise selection with the BIC and AIC to select models (so you will get up to four best models).  How do the results compare to what you obtained above in part (c) and (d)?
 
 ```{r}
-regfit.fwd=regsubsets (Apps~.,data=train, nvmax =17, method='forward')
+# Using all the data in the data set
+regfit.fwd=regsubsets (Apps~.,data=College, nvmax =17, method='forward')
 reg.summary = summary (regfit.fwd)
-reg.summary 
+plot(reg.summary$bic, xlab ="Number of Variables",ylab="BIC", type = 'l', main = 'Forward Step - Performance Measure')
 which.min (reg.summary$bic )
-which.min (reg.summary$aic )
+points (10, reg.summary$bic[10], col ="red",cex =2, pch =20)
+
+plot(reg.summary$cp, xlab ="Number of Variables",ylab="cp", type = 'l', main = 'Forward Step - Performance Measure')
+which.min (reg.summary$cp )
+points (12, reg.summary$cp[12], col ="red",cex =2, pch =20)
+
 ```
 
 ```{r}
-regfit.bwd=regsubsets (Apps~.,data=train, nvmax =17, method='backward')
-reg.summary =  (regfit.bwd)
+regfit.bwd=regsubsets (Apps~.,data=College, nvmax =17, method='backward')
+reg.summary =  summary(regfit.bwd)
+plot(reg.summary$bic, xlab ="Number of Variables",ylab="BIC", type = 'l', main = 'Backward Step - Performance Measure')
+which.min (reg.summary$bic )
+points (10, reg.summary$bic[10], col ="red",cex =2, pch =20)
 
+plot(reg.summary$cp, xlab ="Number of Variables",ylab="cp", type = 'l', main = 'Backward Step - Performance Measure')
+which.min (reg.summary$cp )
+points (12, reg.summary$cp[12], col ="red",cex =2, pch =20)
 ```
+
+For both forward and backward techniques, we select the same models. BIC chooses 10 while CP/AIC will choose 12
+The choices are different from the test MSE (selected 11) and training MSE is lowest for 17 ofcourse but the rate of decrease slows down after 5 and almost ends after 11.

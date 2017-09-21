@@ -1,0 +1,275 @@
+---
+title: "Stat 897 Fall 2017 Data Analysis Assignment 5"
+author: "Penn State"
+date: "Due September 24, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### (1) In the first part of this assignment we will use the College data found in the ISLR library. Split the data into a training set of size 100 and test set with the rest. Your goal is to predict the number of applications received using the other variables in the data set.
+
+```{r}
+library(leaps)
+library(ISLR)
+data("College")
+
+set.seed (1)
+trainingRows=sample (nrow(College), 100, replace = FALSE)
+train = College[trainingRows,]
+test = College[-trainingRows,]
+```
+
+### (a) Fit a "best" model obtained from your previous assignment on the training set and report the test error for this model.
+
+We will use the test MSE to find the best model
+
+```{r}
+regfit.best=regsubsets (Apps~.,data=train, nvmax=17)
+test.mat=model.matrix (Apps~.,data=test)
+test.val.errors =rep(NA ,17)
+for(i in 1:17){
+  coefi=coef(regfit.best ,id=i)
+  pred=test.mat [,names(coefi)] %*% coefi
+  test.val.errors [i]= mean(( test$Apps-pred)^2)
+}
+plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
+```
+
+We see that we get the lowest test MSE for model with 11 parameters:
+```{r}
+which.min(test.val.errors)
+test.val.errors[11]
+```
+
+
+### (b) Fit a ridge regression model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
+
+```{r}
+train.mat <- model.matrix(Apps ~ ., data = train)
+test.mat <- model.matrix(Apps ~ ., data = test)
+cv.ridge <- cv.glmnet(train.mat, train$Apps, alpha = 0)
+bestlam.ridge <- cv.ridge$lambda.min
+bestlam.ridge
+```
+We see that the value of lambda a that results in the smallest crossvalidation
+error is 635. The test MSE associated with this value of lambda is:
+
+```{r}
+grid =10^ seq (10,-2, length =100)
+fit.ridge =glmnet(train.mat, train$Apps, alpha = 0, lambda = grid, thresh = 1e-12)
+pred.ridge = predict (fit.ridge, s=bestlam.ridge, newx=test.mat)
+mean(( pred.ridge - test$Apps)^2)
+```
+### (c) Fit a lasso model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
+
+```{r}
+cv.lasso <- cv.glmnet(train.mat, train$Apps, alpha = 1)
+bestlam.lasso <- cv.lasso$lambda.min
+bestlam.lasso
+```
+We see that the value of lambda a that results in the smallest crossvalidation
+error is 9 The test MSE associated with this value of lambda is:
+
+```{r}
+fit.lasso <- glmnet(train.mat, train$Apps, alpha = 1, lambda = grid, thresh = 1e-12)
+pred.lasso=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
+mean(( pred.lasso - test$Apps)^2)
+```
+
+### (d) Compare the result obtained in (a) -- (c). How accurately can we predict the number of college applications? Is there much difference among the test errors resulting from different approaches?
+
+### (e) Now partition the data into a training set of size 600 and a test set with the rest. Compare the test errors from the "best" linear regression model, ridge and lasso models. Note that, the "best" model here may not be the "best" model obtained before.
+
+```{r}
+trainingRows=sample (nrow(College), 600, replace = FALSE)
+train = College[trainingRows,]
+test = College[-trainingRows,]
+```
+
+We will use the test MSE to find the best model
+
+```{r}
+regfit.best=regsubsets (Apps~.,data=train, nvmax=17)
+test.mat=model.matrix (Apps~.,data=test)
+test.val.errors =rep(NA ,17)
+for(i in 1:17){
+  coefi=coef(regfit.best ,id=i)
+  pred=test.mat [,names(coefi)] %*% coefi
+  test.val.errors [i]= mean(( test$Apps-pred)^2)
+}
+plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
+```
+
+```{r}
+which.min(test.val.errors)
+test.val.errors[11]
+```
+We see that we get the lowest test MSE for model with 11 parameters.
+
+### (b) Fit a ridge regression model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
+
+```{r}
+train.mat <- model.matrix(Apps ~ ., data = train)
+test.mat <- model.matrix(Apps ~ ., data = test)
+cv.ridge <- cv.glmnet(train.mat, train$Apps, alpha = 0)
+bestlam.ridge <- cv.ridge$lambda.min
+bestlam.ridge
+```
+We see that the value of lambda a that results in the smallest crossvalidation
+error is 413. The test MSE associated with this value of lambda is:
+
+```{r}
+fit.ridge =glmnet(train.mat, train$Apps, alpha = 0, lambda = grid, thresh = 1e-12)
+pred.ridge = predict (fit.ridge, s=bestlam.ridge, newx=test.mat)
+mean(( pred.ridge - test$Apps)^2)
+```
+### (c) Fit a lasso model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
+
+```{r}
+cv.lasso <- cv.glmnet(train.mat, train$Apps, alpha = 1)
+bestlam.lasso <- cv.lasso$lambda.min
+bestlam.lasso
+```
+We see that the value of lambda a that results in the smallest crossvalidation
+error is 3. The test MSE associated with this value of lambda is:
+
+```{r}
+fit.lasso <- glmnet(train.mat, train$Apps, alpha = 1, lambda = grid, thresh = 1e-12)
+pred.lasso=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
+mean(( pred.lasso - test$Apps)^2)
+```
+### (f) Do you see any difference between the two sets of results? Comment.
+
+
+### (2) The file Sp.Rdv contains daily returns for 501 stocks in 2016.  It was created as follows.
+
+### (You don't need to run this, i.e. leave eval=FALSE)
+```{r, echo=TRUE, eval=FALSE}
+library("quantmod")
+sp = read.csv("SP500HistoricalComponents.csv")
+Symbols = sp[which(sp$X12.31.2016 == "X"), "Ticker"]
+StartDate = '2016-01-01'
+EndDate = '2016-12-31'
+
+Stocks = lapply(Symbols, function(sym) {
+  print(sym)
+  dailyReturn(na.omit(getSymbols(as.character(sym), from = StartDate, to = EndDate, 
+                                 auto.assign = FALSE, src = "yahoo")))
+})
+
+SPreturns = do.call(merge, Stocks)
+colnames(SPreturns) = Symbols
+
+#Clean out cols with NA
+spreturns = SPreturns[ , colSums(is.na(SPreturns)) == 0]
+save(spreturns, file = "spreturns.Rda")
+```
+
+### Make sure you downloaded the data from the assignment page, and you can load it using:
+```{r}
+library(quantmod)
+load("hw5_spreturns.Rda")
+```
+
+### I have constructed a secret long-only portfolio chosen from these stocks.  It contains between five and twenty stocks.  The daily return of this portfolio for each trading day of 2016 is in the object `portfolioreturns` which you can load from file with:
+```{r}
+load("hw5_portfolioreturnsstatic.Rda")
+dim(spreturns)
+dim(portfolioreturns)
+```
+
+### Your goal is to recover the stocks and weights of the secret portfolio.
+
+### Note that you can think of a portfolio as a vector of nonnegative weights that sum to one.   For simplicity, we are assuming that this portfolio is rebalanced daily at the closing prices.  Then if the daily returns vector on date $d$ is $r_d$ and the weight vector is $w_d$, the daily return for the portfolio is the dot product $r_d \cdot w_d$.  If this were a buy-and-hold portfolio, we would have to back into the returns more carefully.
+
+### (a)  First try to fit an ordinary regression (lm) with `portfolioreturns` as the response and `spreturns` as the predictors. What happens? What problem do you run into?
+
+```{r}
+portWithReturnsAndStocks <- cbind(portfolioreturns, spreturns)
+dim(portWithReturnsAndStocks)
+colnames(portWithReturnsAndStocks)[1] <- "portfolioreturns"
+
+lm.fit=lm(portfolioreturns~., data=portWithReturnsAndStocks)
+summary(lm.fit)
+
+```
+### (b) Now use elasticnet (Lasso, Ridge, or a combination, i.e. glmnet) instead of linear regression to model the secret portfolio. Once get a smaller set of variables from the shrinkage, refit a linear model with only those predictors. [Note, you may want to check out the `plotmo` and `pander` packages for nice plots and outputs for your models.]
+
+```{r}
+port.x=model.matrix (portfolioreturns~., portWithReturnsAndStocks)[,-1]; 
+port.y=portWithReturnsAndStocks$portfolioreturns
+grid =10^ seq (10,-2, length =100)
+port.lasso =glmnet (port.x,port.y,alpha =1, lambda =grid , thresh =1e-12)
+port.ridge =glmnet (port.x,port.y,alpha =0, lambda =grid , thresh =1e-12)
+
+plot(port.lasso)
+plot(port.ridge)
+```
+
+
+### (c) Here is how the portfolio was created. We're essentially randomly sampling columns from spreturns to have non-zero coefficients (portfoliowts) and then generating returns from that.
+
+```{r, echo=TRUE, eval=FALSE}
+t = runif(ncol(spreturns))
+thresh = .98
+mask = t > thresh
+w = runif(ncol(spreturns))
+sum(mask) # number of chosen coefficients
+portfoliowts = w * mask / sum(w * mask)
+myportfolioreturns = spreturns %*% portfoliowts
+```
+
+### Write a function that takes a threshold as input and produces the total error for estimated weights from lasso to the true weights. To do this you will need (1) a function that generates weights and returns for a given threshold function, (2) a function that takes the the returns and outputs the estimated coefficeints from a lasso, and (3) a function that takes the estimated coefficients and returns the error relative to the true weights. Plot the errors for a variety of different thresholds between 0.5 and 1.
+
+```{r}
+generateWeightsAndReturns <- function(threshold) {
+  t = runif(ncol(spreturns))
+  mask = t > threshold
+  w = runif(ncol(spreturns))
+  sum(mask) # number of chosen coefficients
+  portfoliowts = w * mask / sum(w * mask)
+  spreturns %*% portfoliowts
+}
+
+estimateLassoCoef <- function(returns) {
+  portWithReturnsAndStocks <- cbind(returns, spreturns)
+  dim(portWithReturnsAndStocks)
+  colnames(portWithReturnsAndStocks)[1] <- "portfolioreturns"
+  
+  mat <- model.matrix(portfolioreturns ~ ., data = portWithReturnsAndStocks)
+    
+  cv.lasso <- cv.glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1)
+  bestlam.lasso <- cv.lasso$lambda.min
+  bestlam.lasso
+  
+  fit.lasso <- glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1, lambda = grid, thresh = 1e-12)
+  lasso.coef  <- predict(fit.lasso, type = 'coefficients', s = bestlam)[1:6,]
+}
+
+estimateLassoCoef(generateWeightsAndReturns(.55))
+
+returns = generateWeightsAndReturns(.98)
+  portWithReturnsAndStocks <- cbind(returns, spreturns)
+  dim(portWithReturnsAndStocks)
+  colnames(portWithReturnsAndStocks)[1] <- "portfolioreturns"
+  
+  grid =10^ seq (10,-2, length =100)
+  mat <- model.matrix(portfolioreturns ~ ., data = portWithReturnsAndStocks)[,-1]
+  ridge.mod =glmnet (mat, portWithReturnsAndStocks$portfolioreturns, alpha =0, lambda =grid)
+  
+  ridge.mod$lambda [50]
+  coef(ridge.mod)[,50]
+  
+  cv.lasso <- cv.glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1)
+  dim(cv.lasso)
+  bestlam.lasso <- cv.lasso$lambda.min
+  bestlam.lasso
+  
+  fit.lasso <- glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1, lambda = bestlam.lasso, thresh = 1e-12)
+  summary(fit.lasso)
+  lasso.coef  <- predict(fit.lasso, type = 'coefficients', s = bestlam.lasso)
+  lasso.coef[>1]
+```
