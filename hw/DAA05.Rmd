@@ -14,6 +14,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(leaps)
 library(ISLR)
+library(quantmod)
+library(glmnet)
+#install.packages('plotmo')
+library(plotmo)
+
 data("College")
 
 set.seed (1)
@@ -44,6 +49,7 @@ which.min(test.val.errors)
 test.val.errors[11]
 ```
 
+The test MSE is reported to be 1624278
 
 ### (b) Fit a ridge regression model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
 
@@ -63,6 +69,9 @@ fit.ridge =glmnet(train.mat, train$Apps, alpha = 0, lambda = grid, thresh = 1e-1
 pred.ridge = predict (fit.ridge, s=bestlam.ridge, newx=test.mat)
 mean(( pred.ridge - test$Apps)^2)
 ```
+
+The test MSE with ridge is: 1680229
+
 ### (c) Fit a lasso model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
 
 ```{r}
@@ -71,7 +80,7 @@ bestlam.lasso <- cv.lasso$lambda.min
 bestlam.lasso
 ```
 We see that the value of lambda a that results in the smallest crossvalidation
-error is 9 The test MSE associated with this value of lambda is:
+error is 73 The test MSE associated with this value of lambda is:
 
 ```{r}
 fit.lasso <- glmnet(train.mat, train$Apps, alpha = 1, lambda = grid, thresh = 1e-12)
@@ -79,7 +88,18 @@ pred.lasso=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
 mean(( pred.lasso - test$Apps)^2)
 ```
 
+The test MSE with lasso is: 1621135
+
 ### (d) Compare the result obtained in (a) -- (c). How accurately can we predict the number of college applications? Is there much difference among the test errors resulting from different approaches?
+
+We find that:
+Best model with 11 parameters test MSE: 1624278
+Ridge regression test MSE: 1680229
+Lasso test MSE: 1621135
+
+The test MSE is lowest for lasso, closely followed by best model with 11 parameters. Ridge regression has the highest MSE.
+
+MSE for lasso and best model are relatively close than the ridge test MSE. 
 
 ### (e) Now partition the data into a training set of size 600 and a test set with the rest. Compare the test errors from the "best" linear regression model, ridge and lasso models. Note that, the "best" model here may not be the "best" model obtained before.
 
@@ -105,9 +125,11 @@ plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
 
 ```{r}
 which.min(test.val.errors)
-test.val.errors[11]
+test.val.errors[which.min(test.val.errors)]
 ```
-We see that we get the lowest test MSE for model with 11 parameters.
+We see that we get the lowest test MSE for model with 13 parameters. It is a different result than the last time.
+
+The test MSE for the selected model is: 561171.9
 
 ### (b) Fit a ridge regression model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
 
@@ -126,6 +148,8 @@ fit.ridge =glmnet(train.mat, train$Apps, alpha = 0, lambda = grid, thresh = 1e-1
 pred.ridge = predict (fit.ridge, s=bestlam.ridge, newx=test.mat)
 mean(( pred.ridge - test$Apps)^2)
 ```
+The test MSE: 691818.8
+
 ### (c) Fit a lasso model on the training set, with $\lambda$ chosen by cross-validation. Report the test error obtained.
 
 ```{r}
@@ -141,7 +165,24 @@ fit.lasso <- glmnet(train.mat, train$Apps, alpha = 1, lambda = grid, thresh = 1e
 pred.lasso=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
 mean(( pred.lasso - test$Apps)^2)
 ```
+
+The test MSE: 561649.3
+
 ### (f) Do you see any difference between the two sets of results? Comment.
+
+We find that (600 training set):
+Best model with 13 parameters test MSE: 561171.9
+Ridge regression test MSE: 691818.8
+Lasso test MSE: 561649.3
+
+The overall MSE has reduced but we observe a similar pattern as before with the diff that the test MSE is lowest for best model, closely followed by lasso. Ridge regression has the highest MSE.
+
+MSE for lasso and best model are relatively close than the ridge test MSE. 
+
+(100 training set):
+Best model with 11 parameters test MSE: 1624278
+Ridge regression test MSE: 1680229
+Lasso test MSE: 1621135
 
 
 ### (2) The file Sp.Rdv contains daily returns for 501 stocks in 2016.  It was created as follows.
@@ -170,7 +211,6 @@ save(spreturns, file = "spreturns.Rda")
 
 ### Make sure you downloaded the data from the assignment page, and you can load it using:
 ```{r}
-library(quantmod)
 load("hw5_spreturns.Rda")
 ```
 
@@ -188,27 +228,52 @@ dim(portfolioreturns)
 ### (a)  First try to fit an ordinary regression (lm) with `portfolioreturns` as the response and `spreturns` as the predictors. What happens? What problem do you run into?
 
 ```{r}
+options(max.print=1000000)
 portWithReturnsAndStocks <- cbind(portfolioreturns, spreturns)
 dim(portWithReturnsAndStocks)
 colnames(portWithReturnsAndStocks)[1] <- "portfolioreturns"
 
 lm.fit=lm(portfolioreturns~., data=portWithReturnsAndStocks)
 summary(lm.fit)
+options(max.print=252)
 
 ```
+
+There is a clear problem of not having any significant parameter in the model.
+
 ### (b) Now use elasticnet (Lasso, Ridge, or a combination, i.e. glmnet) instead of linear regression to model the secret portfolio. Once get a smaller set of variables from the shrinkage, refit a linear model with only those predictors. [Note, you may want to check out the `plotmo` and `pander` packages for nice plots and outputs for your models.]
 
 ```{r}
-port.x=model.matrix (portfolioreturns~., portWithReturnsAndStocks)[,-1]; 
-port.y=portWithReturnsAndStocks$portfolioreturns
+x=model.matrix (portfolioreturns~., portWithReturnsAndStocks)[,-1]; 
+y=portWithReturnsAndStocks$portfolioreturns
 grid =10^ seq (10,-2, length =100)
-port.lasso =glmnet (port.x,port.y,alpha =1, lambda =grid , thresh =1e-12)
-port.ridge =glmnet (port.x,port.y,alpha =0, lambda =grid , thresh =1e-12)
+port.ridge =glmnet (x, y,alpha =0, thresh =1e-12)
+plot_glmnet(port.ridge, label=20)  
 
-plot(port.lasso)
-plot(port.ridge)
+### Use lasso with CV
+cv.lasso <- cv.glmnet(x, y, alpha = 1)
+bestlam.lasso <- cv.lasso$lambda.min
+bestlam.lasso
+
+port.lasso =glmnet (x, y, alpha =1, thresh =1e-12)
+lasso.coef=predict (port.lasso, type ="coefficients", s=bestlam.lasso )[0:502,]
+
+lasso.coef[lasso.coef !=0]
+
+plot_glmnet(port.lasso, label=20) 
+
+```
+The list of parameters that we find significant from lasso are: ADP + AVGO +   CL + CTXS +   GE +  HPE +  HST  + MCO +  MHK +  NWL + PCLN +  PVH + TSCO + V 
+
+Lets use these to perform linear regressions.
+
+```{r}
+lm.fit=lm(portfolioreturns ~ ADP + AVGO +   CL + CTXS +   GE +  HPE +  HST  + MCO +  MHK +  NWL + PCLN +  PVH + TSCO + V, data=portWithReturnsAndStocks)
+summary(lm.fit)
+ 
 ```
 
+We get much better results in this case.
 
 ### (c) Here is how the portfolio was created. We're essentially randomly sampling columns from spreturns to have non-zero coefficients (portfoliowts) and then generating returns from that.
 
@@ -229,47 +294,47 @@ generateWeightsAndReturns <- function(threshold) {
   t = runif(ncol(spreturns))
   mask = t > threshold
   w = runif(ncol(spreturns))
-  sum(mask) # number of chosen coefficients
   portfoliowts = w * mask / sum(w * mask)
-  spreturns %*% portfoliowts
+  list(Returns=spreturns %*% portfoliowts, Weights=portfoliowts) 
 }
 
 estimateLassoCoef <- function(returns) {
   portWithReturnsAndStocks <- cbind(returns, spreturns)
   dim(portWithReturnsAndStocks)
   colnames(portWithReturnsAndStocks)[1] <- "portfolioreturns"
-  
-  mat <- model.matrix(portfolioreturns ~ ., data = portWithReturnsAndStocks)
-    
-  cv.lasso <- cv.glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1)
+  x=model.matrix (portfolioreturns ~ ., data = portWithReturnsAndStocks)[,-1]
+  y=portWithReturnsAndStocks$portfolioreturns
+  cv.lasso <- cv.glmnet(x,y, alpha = 1)
   bestlam.lasso <- cv.lasso$lambda.min
-  bestlam.lasso
-  
-  fit.lasso <- glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1, lambda = grid, thresh = 1e-12)
-  lasso.coef  <- predict(fit.lasso, type = 'coefficients', s = bestlam)[1:6,]
+
+  lasso.mod =glmnet (x,y,alpha =1)
+  lasso.coef  <- predict(lasso.mod, type = 'coefficients', s = bestlam.lasso)
+  lasso.coef
 }
 
-estimateLassoCoef(generateWeightsAndReturns(.55))
+# find squared differences 
+squaredDifferenceBetweenEstimatedAndTrueWeights <- function(estCoef, trueCoef) {
+  # The est coef include the intercept that we have to remove
+  sum((estCoef[2:502] - trueCoef)^2)
+}
 
-returns = generateWeightsAndReturns(.98)
-  portWithReturnsAndStocks <- cbind(returns, spreturns)
-  dim(portWithReturnsAndStocks)
-  colnames(portWithReturnsAndStocks)[1] <- "portfolioreturns"
-  
-  grid =10^ seq (10,-2, length =100)
-  mat <- model.matrix(portfolioreturns ~ ., data = portWithReturnsAndStocks)[,-1]
-  ridge.mod =glmnet (mat, portWithReturnsAndStocks$portfolioreturns, alpha =0, lambda =grid)
-  
-  ridge.mod$lambda [50]
-  coef(ridge.mod)[,50]
-  
-  cv.lasso <- cv.glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1)
-  dim(cv.lasso)
-  bestlam.lasso <- cv.lasso$lambda.min
-  bestlam.lasso
-  
-  fit.lasso <- glmnet(mat, portWithReturnsAndStocks$portfolioreturns, alpha = 1, lambda = bestlam.lasso, thresh = 1e-12)
-  summary(fit.lasso)
-  lasso.coef  <- predict(fit.lasso, type = 'coefficients', s = bestlam.lasso)
-  lasso.coef[>1]
+wrapper <- function(threshold) {
+  weightsAndReturns = generateWeightsAndReturns(threshold)
+  squaredDifferenceBetweenEstimatedAndTrueWeights(estimateLassoCoef(weightsAndReturns$Returns), weightsAndReturns$Weights)
+}
+
+emitID <- local({
+    idCounter <- 0
+    function(){
+        idCounter <<- idCounter + 1L                     # increment
+        formatC(idCounter, width=9, flag=0, format="d")  # format & return
+    }
+})
+
+df <- data.frame(thresholds=numeric(0), differences=numeric(0))
+lapply(runif(20, min = 0.5, max = 1), function(x) { df[emitID(),] <<- c(x, wrapper(x))  } )
+
+plot(df)
+
+
 ```
