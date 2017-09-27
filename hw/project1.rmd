@@ -1,0 +1,198 @@
+---
+title: "Stat 897 Fall 2017 Project 1"
+author: "Penn State"
+date: "Due October 1, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Linear Regression, Variable Selection, Ridge Regression, Lasso
+
+This project is to be completed individually. You may submit pdf only (Rmd is not needed and you can use another word processing tool if you like).
+
+The diabetes data in Efron et al. (2003) will be used: ten baseline variables: 
+age, sex, body mass index, average blood pressure, and six blood serum measurements were obtained for each of n = 442 diabetes patients, as well as the response of interest, a quantitative measure of disease progression one year after baseline. The data is available in R package `lars`.
+Load the data:
+
+```{r}
+#install.packages('lars')
+library(lars)
+library(leaps)
+library(glmnet)
+
+data(diabetes)
+data.all = data.frame(cbind(diabetes$x, y = diabetes$y)) # change to normal formatting
+x=model.matrix (y ~ ., data = data.all)[,-1]
+y=data.all$y
+
+```
+Partition the patients into two groups: training (~75%) and test (~25%). Please use use the random number generator seed specified below before randomly splitting the data. Since you will not submit a markdown file, please use the set.seed at each noted place.
+```{r}
+seed = 38723
+set.seed(seed) # set random number generator seed to enable reproducibility of results 
+
+test=sample (nrow(data.all), round(nrow(data.all)*.25), replace = FALSE)
+sum(test)
+train=(-test)
+data.train = data.all[train,]
+data.test = data.all[test,]
+```
+
+# Project Requirements
+Write up your results in a professional report, like you would present to a client or internal customer for your analysis. The report should be no more than 4 single-spaced pages long and submitted in  PDF format.
+
+It should include coefficient estimates for each model and  test data mean prediction errors.
+
+Include any other details from your analysis that you feel are worthy of mention.
+
+The report should have sections (e.g., Introduction, Analysis, Results, Conclusion) and provide sufficient details that anyone with a reasonable statistics background could understand exactly what you’ve done and what you concluded.
+
+Consider using tables and figures to enhance your report.  You might use the package "pander" if you are using Rmarkdown for nicely formatted tables.
+
+Do not embed R code in the body of your report (if you are using rmarkdown, use {r echo=FALSE} to supress the printing of the r code), but instead attach the code (code only, not output) in an appendix. The appendix does not count towards the page limit.
+
+## Grading criteria (out of 25)
+
+15 points: fulfilling the project requirements and matching results exactly (this is why you should use the specific random number generator seeds).
+
+10 points: the quality of your report (including: clarity of writing, organization, and layout; appropriate use of tables and figures; careful proof-reading; adherence to report guidelines
+
+## Fit the following models to the training set. For each model extract the model coefficient estimates and calculate the "mean prediction error" in the test set.
+
+1. Least squares regression model using all ten predictors.
+
+Let's first analyze with the least squares regression model.
+
+```{r}
+lm.fit = lm(y~., data=data.train)
+summary(lm.fit)
+confint(lm.fit)
+plot(lm.fit)
+```
+
+```{r}
+lm.predict = predict(lm.fit, data.test)
+mean((lm.predict - y[test])^2)
+```
+
+2. Apply best subset selection using BIC to select the number of predictors.
+
+Next we will perform the best subset selection using BIC
+```{r}
+set.seed(seed)
+regfit.full=regsubsets (y~., data=data.train, nvmax =10)
+reg.summary =summary (regfit.full)
+reg.summary$bic
+plot(reg.summary$bic, xlab =" Number of Variables ", ylab=" BIC ",type="l")
+min_bic_pt = which.min(reg.summary$bic)
+points (min_bic_pt, reg.summary$bic[min_bic_pt], col ="red",cex =2, pch =20)
+min(reg.summary$bic)
+```
+We find that BIC is minimum for model with following parameters:
+
+```{r}
+plot(regfit.full ,scale ="bic")
+coef(regfit.full, min_bic_pt)
+names(coef(regfit.full,5))
+summary(lm(y~sex+bmi+map+hdl+ltg, data = data.train))
+
+
+test.mat=model.matrix (y~.,data=data.test)
+test.val.errors =rep(NA ,10)
+for(i in 1:10){
+  coefi=coef(regfit.full, id=i)
+  pred=test.mat [,names(coefi)] %*% coefi
+  test.val.errors [i]= mean(( data.test$y-pred)^2)
+}
+plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
+
+test.val.errors
+```
+
+
+3. Apply best subset selection using 10-fold cross-validation to select the number of  predictors. Please use a random number seed of 38723 immediately before entering the command.
+
+```{r}
+predict.regsubsets =function (object ,newdata ,id ,...){
+  form=as.formula (object$call [[2]])
+  mat=model.matrix (form ,newdata )
+  coefi =coef(object ,id=id)
+  xvars =names (coefi )
+  mat[,xvars ]%*% coefi
+}
+
+k=10
+set.seed (seed)
+folds=sample (1:k,nrow(data.train), replace =TRUE)
+cv.errors =matrix (NA ,k, 10, dimnames =list(NULL , paste (1:10) ))
+
+for(j in 1:k){
+  best.fit =regsubsets (y~.,data=data.train [folds !=j,], nvmax =10)
+  for(i in 1:10) {
+    pred=predict (best.fit, data.train [folds ==j,], id=i)
+    cv.errors [j,i]=mean( (data.train$y[folds ==j]-pred)^2)
+  }
+}
+
+mean.cv.errors =apply(cv.errors ,2, mean)
+mean.cv.errors
+par(mfrow =c(1,1))
+plot(mean.cv.errors ,type='b')
+which.min(mean.cv.errors)
+points (which.min(mean.cv.errors), min(mean.cv.errors), col ="red",cex =2, pch =20)
+
+best.fit =regsubsets (y~., data=data.train, nvmax =10)
+coefi  = coef(best.fit, which.min(mean.cv.errors))
+coefi
+pred=test.mat [,names(coefi)] %*% coefi
+mean(( data.test$y-pred)^2)
+
+```
+
+4. Ridge regression model using 10-fold cross-validation to select the largest value of $\lambda$ such that the cross-validation  error is within 1 standard error of the minimum (R functions glmnet and  cv.glmnet in package glmnet).  Please use a random number seed of 38723 immediately before entering the command.
+
+```{r}
+set.seed (seed)
+cv.out =cv.glmnet (x[train,],y[train],alpha =0)
+plot(cv.out)
+bestlam.min =cv.out$lambda.min
+bestlam.min
+
+bestlam.1se =cv.out$lambda.1se
+bestlam.1se
+
+grid = 10^seq(10,-2,length=100)
+ridge.mod =glmnet (x[train ,],y[train],alpha =0, lambda=grid, thresh =1e-12)
+ridge.pred=predict (ridge.mod, s=bestlam.min, newx=x[test ,])
+mean(( ridge.pred - y[test])^2)
+
+ridge.pred=predict (ridge.mod, s=bestlam.1se, newx=x[test ,])
+mean(( ridge.pred - y[test])^2)
+ridge.coef=predict (ridge.mod, type ="coefficients", s=bestlam.1se )[0:11,]
+ridge.coef
+
+```
+
+5. Lasso model using  10-fold cross-validation to select the largest value of $\lambda$ such that the cross-validation error is within 1 standard  error of the minimum (R functions glmnet and  cv.glmnet in package  glmnet).  Please use a random number seed of 38723 immediately before entering the command.
+
+```{r}
+set.seed (seed)
+cv.out =cv.glmnet (x[train,],y[train],alpha =1)
+plot(cv.out)
+bestlam.min =cv.out$lambda.min
+bestlam.min
+
+bestlam.1se =cv.out$lambda.1se
+bestlam.1se
+
+lasso.mod =glmnet (x[train ,],y[train],alpha =1, lambda=grid, thresh =1e-12)
+lasso.pred=predict (lasso.mod, s=bestlam.min, newx=x[test ,])
+mean(( lasso.pred - y[test])^2)
+
+lasso.pred=predict (lasso.mod, s=bestlam.1se, newx=x[test ,])
+mean(( lasso.pred - y[test])^2)
+
+```

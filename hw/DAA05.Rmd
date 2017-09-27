@@ -239,7 +239,7 @@ options(max.print=252)
 
 ```
 
-There is a clear problem of not having any significant parameter in the model.
+There is a clear problem of not having any significant parameter in the model. More variables than observations, so linear regression will not give a unique solution!
 
 ### (b) Now use elasticnet (Lasso, Ridge, or a combination, i.e. glmnet) instead of linear regression to model the secret portfolio. Once get a smaller set of variables from the shrinkage, refit a linear model with only those predictors. [Note, you may want to check out the `plotmo` and `pander` packages for nice plots and outputs for your models.]
 
