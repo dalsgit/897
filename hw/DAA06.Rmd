@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #install.packages('corrplot')
-install.packages('heatmaply')
+#install.packages('heatmaply')
 library(heatmaply)
 library(corrplot)
 
@@ -47,6 +47,31 @@ We do see an elbow / knee in the plot.
 
 
 ### c) How would you interpret the factor or first principal component?  How would you describe the covariance matrix that results from keeping only the projection onto the first or first and second components?
+
+Let's first see the first two components
+
+```{r}
+round(pr.out$rotation[,1:2],2)
+biplot(pr.out, cex=0.4)
+
+nComp = 1
+Xhat = pr.out$x[,1:nComp] %*% t(pr.out$rotation[,1:nComp])
+Xhat
+dim(Xhat)
+R <- cor(Xhat)
+corrplot.mixed(R)
+heatmaply(R)
+
+nComp = 2
+Xhat = pr.out$x[,1:nComp] %*% t(pr.out$rotation[,1:nComp])
+Xhat
+dim(Xhat)
+R <- cor(Xhat)
+corrplot.mixed(R)
+heatmaply(R)
+```
+
+We find here that the loadings are both positive and have similar size, therefore Z1 is almost an average of the variables.
 
 
 ### d) Relate the covariance matrix method for PCA (eigendecomposition) to the direct SVD on the given 252 by 100 data matrix $X$.
