@@ -109,7 +109,7 @@ for(i in 1:10){
 }
 plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
 
-test.val.errors
+test.val.errors[5]
 ```
 
 
@@ -188,11 +188,14 @@ bestlam.min
 bestlam.1se =cv.out$lambda.1se
 bestlam.1se
 
-lasso.mod =glmnet (x[train ,],y[train],alpha =1, lambda=grid, thresh =1e-12)
+lasso.mod =glmnet (x[train ,],y[train],alpha =1, thresh =1e-12)
 lasso.pred=predict (lasso.mod, s=bestlam.min, newx=x[test ,])
 mean(( lasso.pred - y[test])^2)
 
 lasso.pred=predict (lasso.mod, s=bestlam.1se, newx=x[test ,])
 mean(( lasso.pred - y[test])^2)
+
+lasso.coef=predict (lasso.mod, type ="coefficients", s=bestlam.1se )[0:11,]
+lasso.coef[lasso.coef !=0]
 
 ```
