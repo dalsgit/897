@@ -27,7 +27,7 @@ cov = cov(spreturns)
 R <- cor(spreturns)
 corrplot.mixed(R)
 heatmaply(R)
-
+pr.out$x[,1]-spreturns[,1]
 ```
 
 ### b) Perform PCA on the stocks, and plot the variance explained.  Do you see any natural "knee"?
@@ -56,7 +56,6 @@ biplot(pr.out, cex=0.4)
 
 nComp = 1
 Xhat = pr.out$x[,1:nComp] %*% t(pr.out$rotation[,1:nComp])
-Xhat
 dim(Xhat)
 R <- cor(Xhat)
 corrplot.mixed(R)
@@ -64,15 +63,16 @@ heatmaply(R)
 
 nComp = 2
 Xhat = pr.out$x[,1:nComp] %*% t(pr.out$rotation[,1:nComp])
-Xhat
 dim(Xhat)
 R <- cor(Xhat)
 corrplot.mixed(R)
 heatmaply(R)
 ```
 
-We find here that the loadings are both positive and have similar size, therefore Z1 is almost an average of the variables.
+We find here that the loadings are positive and have similar size, therefore Z1 is almost an average of the variables.
 
 
 ### d) Relate the covariance matrix method for PCA (eigendecomposition) to the direct SVD on the given 252 by 100 data matrix $X$.
+
+Singular values are related to the eigenvalues of covariance matrix. Eigenvalues show the variances of the respective Principal Components.
 
