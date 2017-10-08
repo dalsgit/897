@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ### a) Restrict to the first 100 columns (first 100 stocks) in the data.  Compute the covariance matrix of these stocks. Using the `corrplot` package, produce a visual of the \textit{correlation} matrix. Do not print the covariance matrix. (I will take points off if you do because printing out a 100 x 100 matrix really isn't helpful, visuals are much better!)
 
 ```{r}
+#C:\\study\\psu\\git\\897\\hw   C:\\study\\897\\hw
+setwd("C:\\study\\psu\\git\\897\\hw")
 #install.packages('corrplot')
 #install.packages('heatmaply')
 library(heatmaply)
@@ -21,58 +23,100 @@ library(corrplot)
 
 load("hw5_spreturns.Rda")
 dim(spreturns)
+colMeans(spreturns)
 spreturns = spreturns[,1:100]
-dim(spreturns)
-cov = cov(spreturns)
-R <- cor(spreturns)
+
+# Lets scale and center the spreturns object prior to PCA and SVD methods are used.
+spreturns_normalized = scale(spreturns, center = TRUE, scale = TRUE)
+remove(spreturns)
+
+cov = cov(spreturns_normalized)
+R <- cor(spreturns_normalized)
 corrplot.mixed(R)
 heatmaply(R)
-pr.out$x[,1]-spreturns[,1]
+
 ```
+From the cor plot and the heat map we see mostly light blue (in cor plot) and some areas of yellow (in the heatmap). These indicate that the cor/covariance is at high level only for a few elements. 
 
 ### b) Perform PCA on the stocks, and plot the variance explained.  Do you see any natural "knee"?
 
 ```{r}
-pr.out =prcomp (spreturns , scale =TRUE)
+pr.out =prcomp (spreturns_normalized)
 pr.var =pr.out$sdev ^2
 pve=pr.var/sum(pr.var)
+pve
 
-plot(pve , xlab="Principal Component", 
-     ylab="Proportion of Variance Explained", ylim=c(0,1) ,type='b')
+plot(pve , xlab="Principal Component", ylab="Proportion of Variance Explained", ylim=c(0,1) ,type='b')
 plot(cumsum (pve ), xlab="Principal Component", ylab ="Cumulative Proportion of Variance Explained",
      ylim=c(0,1), type='b')
 ```
 
-We do see an elbow / knee in the plot. 
+We do see an elbow / knee in the plot. The first principal component accounts for most of the overall variance (33.9%). The second principal component accounts for far less variance (7.5%) but can be used as compared to the remaining principal component that account for very less marginal variance. First two principal components should be used for further analysis.
 
 
 ### c) How would you interpret the factor or first principal component?  How would you describe the covariance matrix that results from keeping only the projection onto the first or first and second components?
 
-Let's first see the first two components
+The first principal component accounts for most of the overall variance (33.9%). The second principal component accounts for far less variance (7.5%) but can be used as compared to the remaining principal component that account for very less marginal variance. 
+
+Let's now see the first two components
 
 ```{r}
 round(pr.out$rotation[,1:2],2)
 biplot(pr.out, cex=0.4)
+```
 
-nComp = 1
-Xhat = pr.out$x[,1:nComp] %*% t(pr.out$rotation[,1:nComp])
-dim(Xhat)
-R <- cor(Xhat)
-corrplot.mixed(R)
-heatmaply(R)
+We find here that the loadings of the first are positive and have similar size, therefore Z1 is almost an average of the variables.
 
+```{r}
 nComp = 2
-Xhat = pr.out$x[,1:nComp] %*% t(pr.out$rotation[,1:nComp])
-dim(Xhat)
+Xhat = pr.out$x[,1:nComp] #%*% t(pr.out$rotation[,1:nComp])
+round(cov(Xhat))
 R <- cor(Xhat)
 corrplot.mixed(R)
 heatmaply(R)
 ```
 
-We find here that the loadings are positive and have similar size, therefore Z1 is almost an average of the variables.
+The corr plot is interesting and validates the orthogonality of the principal components. The  second principal component, i.e. the second eigenvector, is the direction orthogonal to the first component with the most variance. Because it is orthogonal to the first eigenvector, their projections will be uncorrelated. . In fact, projections on to all the principal components are uncorrelated with each other
 
+We also see that covariance is a diagonal matrix. 
 
 ### d) Relate the covariance matrix method for PCA (eigendecomposition) to the direct SVD on the given 252 by 100 data matrix $X$.
 
 Singular values are related to the eigenvalues of covariance matrix. Eigenvalues show the variances of the respective Principal Components.
+
+```{r}
+plot(pr.out$x[, 1], pr.out$x[, 2], main = "PCA", xlab = "PC1", ylab = "PC2")
+sv <- svd(spreturns_normalized)
+plot(sv$u[, 1], sv$u[, 2], main = "SVD", xlab = "U1", ylab = "U2")
+```
+
+PCA is equivalent to performing the SVD on the centered data. Above we see that the plots are exactly the same - Columns of U from the SVD correspond to the principal components x in the PCA.
+
+```{r}
+sv$v[1:5, 1:5]
+pr.out$rotation[1:5, 1:5]
+round(sv$v[1:5, 1:5] - pr.out$rotation[1:5, 1:5])
+```
+
+If matrix M is our data matrix (mXn) m rows represents our data points and and the n columns represents the features of the data point.  
+
+SVD: Since the data matrix M will not have exactly the same number of data points as features (i.e. m???n) the matrix M is not a square matrix and a diagonalization of the from M=U??UT where U is an m×m orthogonal matrix of the eigenvectors of M and ?? is the diagonal m×m matrix of the eigenvalues of M will not exist.  However, for such cases where n???m, a diff decomposition is possible and M can be factored as follows M=U??VT, where 
+
+1.	U is an m×m orthogonal matrix of the the "left singular-vectors" of M.
+2.	V is an n×n orthogonal matrix of the the "right singular-vectors" of M.
+3.	And, ?? is an m×n matrix with non-zero diagonal entries referred to as the "singular-values" of M.
+
+PCA: PCA uses the symmetric n×n covariance matrix of non-symmetric M i.e MTM.  Because MTM is symmetric it is diagonalizable. So PCA works by finding the eigenvectors of the covariance matrix and ranks them by their respective eigenvalues.  The eigenvectors with the greatest eigenvalues are the Principal Components of the data matrix.
+
+Some matrix algebra can be done to show that the Principal Components of a PCA diagonalization of the covariance matrix MTM are the same left-singular vectors that are found through SVD (i.e. the columns of matrix V):
+
+From SVD we have M=U??VT so...
+
+.	MTM=(U??VT)T(U??VT)
+.	MTM=(V??TUT)(U??VT)
+.	but since U is orthogonal UTU=I
+so
+.	MTM=V??2VT
+
+where  ??2 is an n×n diagonal matrix with the diagonal elements ??2 from the matrix ??.  So the matrix of eigenvectors V in PCA are the same as the singular vectors from SVD, and the eigenvalues generated in PCA are just the squares of the singular values from SVD.  
 
