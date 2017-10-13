@@ -14,6 +14,7 @@ In this assignment we will use the Khan data found in the ISLR library. This dat
 ### a) The data is alreay split into test and train in the `Khan` object. First, combine the xtrain and xtest datasets and run PCA on the combined predictor data set. Plot the components versus percentage variance explained.
 
 ```{r}
+#install.packages('pls')
 library(ISLR)
 library(pls)
 
@@ -23,12 +24,29 @@ dim(Khan$xtrain)
 dim(Khan$xtest)
 length(Khan$ytrain)
 length(Khan$ytest)
-str(ytest)
-combined.x <- rbind(xtrain, xtest)
-combined.y <- c(ytrain, ytest)
-dim(combined.x)
-length(combined.y)
 
+combined.x <- rbind(xtrain, xtest)
+dim(combined.x)
+combined.y <- c(ytrain, ytest)
+length(combined.y)
+combined.data = cbind.data.frame(combined.x, y=c(combined.y))
+dim(combined.data)
+
+# check that we dont have null rows
+sum(is.na(combined.data ))
+
+pr.out =prcomp (combined.x, scale. = TRUE)
+pr.var =pr.out$sdev ^2
+pve=pr.var/sum(pr.var)
+pve
+
+plot(pve , xlab="Principal Component", ylab="Proportion of Variance Explained", ylim=c(0,1) ,type='b')
+plot(cumsum (pve ), xlab="Principal Component", ylab ="Cumulative Proportion of Variance Explained",
+     ylim=c(0,1), type='b')
+
+# we can also use PCR to get the result
+# pcr.fit=pcr(y~., data=combined.data ,scale=TRUE , validation ="CV")
+# plot(pcr.fit$Xvar/pcr.fit$Xtotvar, xlab="Principal Component", ylab="Proportion of Variance Explained", ylim=c(0,1) ,type='b')
 
 ```
 
@@ -38,11 +56,139 @@ length(combined.y)
 
 ```{r}
 set.seed(34)
+train = cbind.data.frame(xtrain, y=c(ytrain))
+test = cbind.data.frame(xtest, y=c(ytest))
 
+pcr.fit=pcr(y~., data=train, scale=TRUE , validation ="CV", segments=5)
+summary(pcr.fit)
 
+validationplot(pcr.fit ,val.type="MSEP")
 ```
+
+The lowest CV is for 49 components. This amounts to simply performing least squares, because when all of the components are used in PCR no dimension reduction occurs. 
+However, from the plot we also see that the cross-validation error is roughly the same when only 30
+components are included in the model. This suggests that a model that uses just a small number of components might suffice.
+
+```{r}
+pcr.pred=predict (pcr.fit, xtest, ncomp =49)
+mean((pcr.pred - ytest)^2)
+```
+
+The MSE with all the components (49) = 0.1194346
+The % variance explained of parameters with all the components (49) = 96.69
+The % variance explained of response with all the components (49) = 99.52
+
+Let's also get the MSE with 30 components
+```{r}
+pcr.pred=predict (pcr.fit, xtest, ncomp =30)
+mean((pcr.pred - ytest)^2)
+```
+The MSE with 30 components = 0.120898
+The % variance explained of parameters with 30 components = 87.72
+The % variance explained of response with 30 components = 98.04
 
 ### c) Fit a PLS model on the training set, with M chosen by 5-fold cross-validation. Report the test MSE obtained, along with the value of M selected by cross-validation. What is the percent variance explained on the combined predictor dataset for the number of components chosen here?
 
+```{r}
+pls.fit=plsr(y~., data=train, scale=TRUE, validation="CV", segments=5)
+summary (pls.fit )
+
+validationplot(pls.fit ,val.type="MSEP")
+```
+
+The lowest CV is for 9 components after which it only increases slightly and stays constant after 22 components before increasing drastically at 49 components. 
+
+```{r}
+pls.pred=predict (pls.fit, xtest, ncomp =9)
+mean((pls.pred - ytest)^2)
+
+pls.pred=predict (pls.fit, xtest, ncomp =22)
+mean((pls.pred - ytest)^2)
+```
+
+The test MSE with 9 components = 0.1244835
+The test MSE with 22 components = 0.1230567
+
+The last part requires percent variance explained on the combined predictor dataset so we perform the pls on the combined data set
+
+```{r}
+pls.fit=plsr(y~., data=combined.data, scale=TRUE, validation="CV", segments=5)
+summary (pls.fit )
+```
+
+The % variance explained of parameters with 9 components = 50.98
+The % variance explained of response with 9 components = 99.91
+
+The % variance explained of parameters with 22 components = 73.52
+The % variance explained of response with 22 components = 100
+
+
 
 ### d) Perform Lasso and Ridge with lambda chosen by 5-fold CV. Compute the test MSE. How do your results compare to the PCR and PLS results? Which model would you prefer? (Think about both prediction quality and inference.)
+
+```{r}
+train.mat <- model.matrix(y~ ., data = train)
+test.mat <- model.matrix(y~ ., data = test)
+
+cv.ridge <- cv.glmnet(train.mat, train$y, alpha = 0, nfolds = 5)
+bestlam.ridge <- cv.ridge$lambda.min
+bestlam.ridge
+```
+We see that the value of lambda a that results in the smallest crossvalidation
+error is 9.318 
+
+The test MSE associated with this value of lambda is:
+
+```{r}
+grid =10^ seq (10,-2, length =100)
+fit.ridge =glmnet(train.mat, train$y, alpha = 0, lambda = grid, thresh = 1e-12)
+pred.ridge = predict (fit.ridge, s=bestlam.ridge, newx=test.mat)
+mean(( pred.ridge - test$y)^2)
+
+ridge.coef  <- predict(fit.ridge, type = 'coefficients', s = bestlam.ridge)
+length(ridge.coef[ridge.coef !=0])
+```
+
+The test MSE with ridge is: 0.1508586
+
+Now we will try Lasso
+```{r}
+cv.lasso <- cv.glmnet(train.mat, train$y, alpha = 1, nfolds = 5)
+summary(cv.lasso)
+bestlam.lasso <- cv.lasso$lambda.min
+bestlam.lasso
+```
+We see that the value of lambda a that results in the smallest crossvalidation
+error is 0.0107139
+
+The test MSE associated with this value of lambda is:
+
+```{r}
+fit.lasso <- glmnet(train.mat, train$y, alpha = 1, lambda = grid, thresh = 1e-12)
+pred.lasso=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
+mean(( pred.lasso - test$y)^2)
+```
+
+The test MSE with lasso is: 0.1982305
+
+To get the coefficients in order to get an idea of how many parameters are used in a lasso model,
+we will first fit a model with the entire dataset.
+```{r}
+out=glmnet (combined.x, combined.y, alpha =1, lambda =grid)
+lasso.coef  <- predict(out, type = 'coefficients', s = bestlam.lasso)
+length(lasso.coef[lasso.coef !=0])
+```
+
+Let's now tabulate the results
+
+The test MSE with the different methods:
+PCR (49):  0.119
+PCR (30):  0.121
+PLS (9):   0.124
+Ridge:     0.151
+Lasso:     0.198
+
+The PCR at 49 components even though with the lowest test MSE is effectively same as least squares. Ridge also uses all the parameters as expected and still has higher MSE than others.
+Therefore the choice comes between Lasso and PLS with 9 components. The lasso has a clear advantage that it reduces the number of components to 75. While this number appears much higher than the PLS with 9 components - this isn't an apples to apples comparison. The PLS (and same for PCR) components are linear combinations of all the components and therefore effectively still use all components. On the other hand PLS with 9 components has much lesser test MSE as compared to Lasso. 
+
+Therefore in conclusion we should use lasso for its interpretability and PLS for its lowest test MSE. The choice between the two should be made in the context of research and its final usage. 
