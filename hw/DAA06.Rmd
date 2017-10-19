@@ -2,7 +2,9 @@
 title: "Stat 897 Spring 2017 Data Analysis Assignment 6"
 author: "Penn State"
 date: "Due October 8, 2017"
-output: pdf_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -18,12 +20,12 @@ knitr::opts_chunk$set(echo = TRUE)
 setwd("C:\\study\\psu\\git\\897\\hw")
 #install.packages('corrplot')
 #install.packages('heatmaply')
+#install.packages('knitr')
+
 library(heatmaply)
 library(corrplot)
 
 load("hw5_spreturns.Rda")
-dim(spreturns)
-colMeans(spreturns)
 spreturns = spreturns[,1:100]
 
 # Lets scale and center the spreturns object prior to PCA and SVD methods are used.
@@ -100,23 +102,23 @@ round(sv$v[1:5, 1:5] - pr.out$rotation[1:5, 1:5])
 
 If matrix M is our data matrix (mXn) m rows represents our data points and and the n columns represents the features of the data point.  
 
-SVD: Since the data matrix M will not have exactly the same number of data points as features (i.e. m???n) the matrix M is not a square matrix and a diagonalization of the from M=U??UT where U is an m×m orthogonal matrix of the eigenvectors of M and ?? is the diagonal m×m matrix of the eigenvalues of M will not exist.  However, for such cases where n???m, a diff decomposition is possible and M can be factored as follows M=U??VT, where 
+SVD: Since the data matrix M will not have exactly the same number of data points as features (i.e. mXn) the matrix M is not a square matrix and a diagonalization of the from M=USUT where U is an m×m orthogonal matrix of the eigenvectors of M and S is the diagonal m×m matrix of the eigenvalues of M will not exist.  However, for such cases where nXm, a diff decomposition is possible and M can be factored as follows M=USVT, where 
 
 1.	U is an m×m orthogonal matrix of the the "left singular-vectors" of M.
 2.	V is an n×n orthogonal matrix of the the "right singular-vectors" of M.
-3.	And, ?? is an m×n matrix with non-zero diagonal entries referred to as the "singular-values" of M.
+3.	And, S is an m×n matrix with non-zero diagonal entries referred to as the "singular-values" of M.
 
 PCA: PCA uses the symmetric n×n covariance matrix of non-symmetric M i.e MTM.  Because MTM is symmetric it is diagonalizable. So PCA works by finding the eigenvectors of the covariance matrix and ranks them by their respective eigenvalues.  The eigenvectors with the greatest eigenvalues are the Principal Components of the data matrix.
 
 Some matrix algebra can be done to show that the Principal Components of a PCA diagonalization of the covariance matrix MTM are the same left-singular vectors that are found through SVD (i.e. the columns of matrix V):
 
-From SVD we have M=U??VT so...
+From SVD we have M=USVT so...
 
-.	MTM=(U??VT)T(U??VT)
-.	MTM=(V??TUT)(U??VT)
+.	MTM=(USVT)T(USVT)
+.	MTM=(VSTUT)(USVT)
 .	but since U is orthogonal UTU=I
 so
-.	MTM=V??2VT
+.	MTM=VS2VT
 
-where  ??2 is an n×n diagonal matrix with the diagonal elements ??2 from the matrix ??.  So the matrix of eigenvectors V in PCA are the same as the singular vectors from SVD, and the eigenvalues generated in PCA are just the squares of the singular values from SVD.  
+where  S2 is an n×n diagonal matrix with the diagonal elements S2 from the matrix S.  So the matrix of eigenvectors V in PCA are the same as the singular vectors from SVD, and the eigenvalues generated in PCA are just the squares of the singular values from SVD.  
 
