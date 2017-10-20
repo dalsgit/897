@@ -1,0 +1,187 @@
+---
+title: "Stat 897 Fall 2017 Data Analysis Assignment 8"
+author: "Penn State"
+date: "Due October 22, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this assignment we again use the College data found in the ISLR library, with the 600 observation training set (using the rest as the test data).
+
+### (a) Using out-of-state tuition as the response and the other variables as the predictors, perform forward stepwise selection on the training set in order to identify a satisfactory model that uses just a subset of the predictors. Please set the seed at 801 once at the beginning before choosing the training set.
+
+```{r}
+library(leaps)
+library(ISLR)
+#install.packages('ISLR')
+library(gam)
+data("College")
+attach(College)
+
+set.seed (801)
+trainingRows=sample (nrow(College), 600, replace = FALSE)
+train = College[trainingRows,]
+test = College[-trainingRows,]
+
+regfit.fwd=regsubsets (Outstate~.,data=train, nvmax =17, method='forward')
+reg.summary = summary (regfit.fwd)
+plot(reg.summary$bic, xlab ="Number of Variables",ylab="BIC", type = 'l', main = 'Forward Step - Performance Measure')
+which.min (reg.summary$bic )
+points (which.min (reg.summary$bic ), reg.summary$bic[which.min (reg.summary$bic )], col ="red",cex =2, pch =20)
+
+plot(reg.summary$cp, xlab ="Number of Variables",ylab="cp", type = 'l', main = 'Forward Step - Performance Measure')
+which.min (reg.summary$cp )
+points (which.min (reg.summary$cp ), reg.summary$cp[which.min (reg.summary$cp )], col ="red",cex =2, pch =20)
+
+plot(reg.summary$adjr2, xlab ="Number of Variables",ylab="Adj R2", type = 'l', main = 'Forward Step - Performance Measure')
+which.max (reg.summary$adjr2 )
+points (which.max (reg.summary$adjr2 ), reg.summary$cp[which.max (reg.summary$adjr2 )], col ="red",cex =2, pch =20)
+
+test.mat=model.matrix (Outstate~.,data=test)
+test.val.errors =rep(NA ,17)
+for(i in 1:17){
+	coefi=coef(regfit.fwd ,id=i)
+	pred=test.mat [,names(coefi)] %*% coefi
+	test.val.errors [i]= mean(( test$Apps-pred)^2)
+}
+plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
+
+```
+
+The above indicates that we get the following choice based on the different measures:
+
+BIC - 6
+CP - 13
+Adjusted R2 - 14
+
+From a visual inspection, it is clear that the elbow in all the plots happens at 6 and therefore it could be a good choice to move forward. Let see the various parameters included in this model
+
+```{r}
+names(coef(regfit.fwd ,id=6))
+```
+
+### (b)  Fit a GAM on the training data, using out-of-state tuition as the response and the features selected in the previous step as the predictors. Use appropriate nonlinear components (e.g. natural splines, step functions) for the variables that need it as in the salary example from the book.  Plot the results, and explain your findings.   What nonlinear components did you use?
+
+Let's start with a plot
+```{r}
+#"PrivateYes"  "Room.Board"  "Terminal"    "perc.alumni" "Expend"      "Grad.Rate"
+pairs(College[, c("Outstate", "Private", "Room.Board", "Terminal", "perc.alumni", "Expend", "Grad.Rate")])
+```
+It seems like Outstate with Room.Board and perc.alumni appear to be linear while Terminal, Expend and Grad.Rate is non-linear.
+
+Now lets analyze further and compare: 
+```{r}
+fit.rb= lm(Outstate~poly(Room.Board ,5) ,data=train)
+coef(summary(fit.rb))
+# The relationship appears to be only linear
+
+fit.t= lm(Outstate~poly(Terminal ,5) ,data=train)
+coef(summary(fit.t))
+# We have a cubic relationship, we can try ns
+
+fit.pa= lm(Outstate~poly(perc.alumni ,5) ,data=train)
+coef(summary(fit.pa))
+# The relationship appears to be only linear
+
+fit.e= lm(Outstate~poly(Expend ,5) ,data=train)
+coef(summary(fit.e))
+# We have a cubic relationship, we can try ns
+
+fit.gr= lm(Outstate~poly(Grad.Rate ,5) ,data=train)
+coef(summary(fit.gr))
+# We have a cubic relationship, we can try ns
+
+fit.1=gam(Outstate~Room.Board, data=train)
+fit.2=gam(Outstate~Room.Board+poly(Terminal,3), data=train)
+anova(fit.1, fit.2)
+# 2nd is better, lets continue
+
+fit.3=gam(Outstate~Room.Board+poly(Terminal,3)+perc.alumni, data=train)
+anova(fit.1, fit.2, fit.3)
+# 3rd is best, lets continue
+
+fit.4=gam(Outstate~Room.Board+poly(Terminal,3)+perc.alumni+poly(Expend,3), data=train)
+anova(fit.1, fit.2, fit.3, fit.4)
+# 4th is best, lets continue
+
+fit.5=gam(Outstate~Room.Board+poly(Terminal,3)+perc.alumni+poly(Expend,3)+poly(Grad.Rate,3), data=train)
+anova(fit.1, fit.2, fit.3, fit.4, fit.5)
+# 5th is best, lets continue
+
+fit.6=gam(Outstate~Room.Board+poly(Terminal,3)+perc.alumni+poly(Expend,3)+poly(Grad.Rate,3)+Private, data=train)
+anova(fit.1, fit.2, fit.3, fit.4, fit.5, fit.6)
+
+# We will try a model with natural splines
+fit.7=gam(Outstate~Room.Board+ns(Terminal,3)+perc.alumni+ns(Expend,3)+ns(Grad.Rate,3)+Private, data=train)
+
+
+#Since model 6 and 7 are not nested, lets find the MSE on the test data to perform further comparison
+pred=predict (fit.6,newdata =test, se=T)
+mean((test$Outstate - pred$fit)^2)
+
+pred=predict (fit.7,newdata =test, se=T)
+mean((test$Outstate - pred$fit)^2)
+
+# We get lower Test MSE with fit.7 (uses ns)
+par(mfrow =c(3,3))
+plot(fit.7, se=TRUE ,col ="blue")
+```
+
+### (c) Evaluate both models obtained from part (a) and (b) on the test set, and explain the results obtained.
+
+Test MSE for model from part (a)
+```{r}
+coefi=coef(regfit.fwd, id=13)
+pred=test.mat [,names(coefi)] %*% coefi
+TestMSE_partA = mean(( test$Apps-pred)^2)
+```
+
+Test MSE for model from part (b)
+```{r}
+pred=predict (fit.7 ,newdata =test, se=T)
+TestMSE_partB = mean((test$Outstate - pred$fit)^2)
+
+TestMSE_partA / TestMSE_partB
+```
+
+Test MSE from the non-linear model is a fraction of the test MSE obtained in the part a. Clearly we have a non-linear relationship and it should be used for modeling the relationship.
+
+### (d) For which variables, if any, is there evidence of a non-linear relationship with the response?
+
+We reviewed all these above individually and found non-linear relationships for the following: Terminal, Expend, Grad.Rate
+
+The result are reproduced here:
+
+```{r}
+#"PrivateYes"  "Room.Board"  "Terminal"    "perc.alumni" "Expend"      "Grad.Rate"
+fit.rb= lm(Outstate~poly(Room.Board ,5) ,data=train)
+coef(summary(fit.rb))
+# The relationship appears to be only linear
+
+fit.t= lm(Outstate~poly(Terminal ,5) ,data=train)
+coef(summary(fit.t))
+# We have a cubic relationship, we can try ns
+
+fit.pa= lm(Outstate~poly(perc.alumni ,5) ,data=train)
+coef(summary(fit.pa))
+# The relationship appears to be only linear
+
+fit.e= lm(Outstate~poly(Expend ,5) ,data=train)
+coef(summary(fit.e))
+# We have a cubic relationship, we can try ns
+
+fit.gr= lm(Outstate~poly(Grad.Rate ,5) ,data=train)
+coef(summary(fit.gr))
+# We have a cubic relationship, we can try ns
+
+```
+
+We can also see in the summary of the GAM model:
+```{r}
+summary(fit.7)
+```
+
+All the selected terms are significant and shows non-linear relations for:  Terminal, Expend, Grad.Rate
