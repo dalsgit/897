@@ -1,0 +1,85 @@
+---
+title: "Stat 897 Fall 2017 Data Analysis Assignment 9"
+author: "Penn State"
+date: "Due October 29, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this assignment we will use the Boston data found in the MASS library.
+
+### 1. Fit classification models in order to predict whether a given suburb has a crime rate above or below the median. Explore logistic regression, LDA, and KNN models using various subsets of the predictors. At this point in the class, you should feel fairly comfortable making such an open-ended exploration.
+
+### Describe your findings, show appropriate results, and determine why some techniques perform better or worse and whic had the best performance.
+
+```{r}
+library(MASS)
+library(class)
+data("Boston")
+attach(Boston)
+crim_median <- rep(0, length(crim))
+crim_median[crim > median(crim)] <- 1
+
+# add new column to the data frame
+Boston <- data.frame(Boston, crim_median)
+# remove the column crim
+Boston <- subset(Boston, select=-c(crim))
+
+cv=cv.glmnet(x,y) 
+model<-glmnet(x,y,family="binomial",lambda=cv$lambda.min) coef<-predict(model, type="coefficients")
+
+train <- 1:(length(crim) / 2)
+test <- (length(crim) / 2 + 1):length(crim)
+Boston.train <- Boston[train, ]
+Boston.test <- Boston[test, ]
+crim_median.test <- crim_median[test]
+
+fit.glm <- glm(crim_median ~ . - crim_median, data = Boston, family = binomial, subset = train)
+
+probs <- predict(fit.glm, Boston.test, type = "response")
+pred.glm <- rep(0, length(probs))
+pred.glm[probs > 0.5] <- 1
+table(pred.glm, crim_median.test)
+
+mean(pred.glm != crim_median.test)
+
+fit.glm <- glm(crim_median ~ . - crim_median - chas - nox, data = Boston, family = binomial, subset = train)
+probs <- predict(fit.glm, Boston.test, type = "response")
+pred.glm <- rep(0, length(probs))
+pred.glm[probs > 0.5] <- 1
+table(pred.glm, crim_median.test)
+
+mean(pred.glm != crim_median.test)
+
+fit.lda <- lda(crim_median ~ . - crim_median, data = Boston, subset = train)
+pred.lda <- predict(fit.lda, Boston.test)
+table(pred.lda$class, crim_median.test)
+mean(pred.lda$class != crim_median.test)
+fit.lda <- lda(crim_median ~ . - crim_median - chas - nox, data = Boston, subset = train)
+pred.lda <- predict(fit.lda, Boston.test)
+table(pred.lda$class, crim_median.test)
+mean(pred.lda$class != crim_median.test)
+
+train.X <- cbind(zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, black, lstat, medv)[train, ]
+test.X <- cbind(zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, black, lstat, medv)[test, ]
+train.crim_median <- crim_median[train]
+set.seed(1)
+pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
+table(pred.knn, crim_median.test)
+mean(pred.knn != crim_median.test)
+pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
+table(pred.knn, crim_median.test)
+mean(pred.knn != crim_median.test)
+
+pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
+table(pred.knn, crim_median.test)
+
+mean(pred.knn != crim_median.test)
+
+```
+
+### 2. Now repeat the exercise but classify those neighborhoods in the bottom 10% percentile with lowest crime rates. What differences do you notice between this and the previous classification task (hint: look at the confusion matrix)? Why may it be deceiving to only look at misclassification rate? What other measures can you consider?
+
