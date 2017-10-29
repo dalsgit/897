@@ -89,11 +89,11 @@ Ridge: selects all parameters - we will ignore this as we get smaller models wit
 
 ```{r}
 # do some data processing to prepare the categorical variable
-crim_median <- rep(0, length(crim))
-crim_median[crim > median(crim)] <- 1
+crim_modified <- rep(0, length(crim))
+crim_modified[crim > median(crim)] <- 1
 
 # add new column to the data frame
-Boston <- data.frame(Boston, crim_median)
+Boston <- data.frame(Boston, crim_modified)
 ```
 
 ```{r}
@@ -101,32 +101,32 @@ train <- 1:(length(crim) * 0.7)
 test <- (length(train)+ 1):length(crim)
 Boston.train <- Boston[train, ]
 Boston.test <- Boston[test, ]
-crim_median.test <- crim_median[test]
+crim_modified.test <- crim_modified[test]
 
 # Logistic Regression: Model with all parameters
-fit.glm <- glm(crim_median ~ . - crim_median - crim, data = Boston, family = binomial, subset = train)
+fit.glm <- glm(crim_modified ~ . - crim_modified - crim, data = Boston, family = binomial, subset = train)
 probs <- predict(fit.glm, Boston.test, type = "response")
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
-conf_matrix = table(pred.glm, crim_median.test)
+conf_matrix = table(pred.glm, crim_modified.test)
 conf_matrix
-cm=confusionMatrix(data = pred.glm, reference = crim_median.test)
+cm=confusionMatrix(data = pred.glm, reference = crim_modified.test)
 cm$byClass
-mean(pred.glm == crim_median.test)
+mean(pred.glm == crim_modified.test)
 ```
 
 We see that the results appear good. However specificity is 41%
 
 ```{r}
 # Logistic Regression: Model with parameters selected by lasso
-fit.glm <- glm(crim_median ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, family = binomial, subset = train)
+fit.glm <- glm(crim_modified ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, family = binomial, subset = train)
 probs <- predict(fit.glm, Boston.test, type = "response")
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
-table(pred.glm, crim_median.test)
-cm=confusionMatrix(data = pred.glm, reference = crim_median.test)
+table(pred.glm, crim_modified.test)
+cm=confusionMatrix(data = pred.glm, reference = crim_modified.test)
 cm$byClass
-mean(pred.glm == crim_median.test)
+mean(pred.glm == crim_modified.test)
 
 ```
 
@@ -134,25 +134,25 @@ Results similar to when we use all params.
 
 ```{r}
 # Logistic Regression: Model with parameters selected by forward selection
-fit.glm <- glm(crim_median ~ rad + black + lstat, data = Boston, family = binomial, subset = train)
+fit.glm <- glm(crim_modified ~ rad + black + lstat, data = Boston, family = binomial, subset = train)
 probs <- predict(fit.glm, Boston.test, type = "response")
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
-table(pred.glm, crim_median.test)
-cm_lr=confusionMatrix(data = pred.glm, reference = crim_median.test)
+table(pred.glm, crim_modified.test)
+cm_lr=confusionMatrix(data = pred.glm, reference = crim_modified.test)
 cm_lr$byClass
-mean(pred.glm == crim_median.test)
+mean(pred.glm == crim_modified.test)
 ```
 
 Better results and model is simpler. Moving to LDA: 
 
 ```{r}
 # LDA: Model with all parameters
-fit.lda <- lda(crim_median ~ . - crim_median  - crim, data = Boston, subset = train)
+fit.lda <- lda(crim_modified ~ . - crim_modified  - crim, data = Boston, subset = train)
 pred.lda <- predict(fit.lda, Boston.test)
-table(pred.lda$class, crim_median.test)
-mean(pred.lda$class == crim_median.test)
-cm=confusionMatrix(data = pred.lda$class, reference = crim_median.test)
+table(pred.lda$class, crim_modified.test)
+mean(pred.lda$class == crim_modified.test)
+cm=confusionMatrix(data = pred.lda$class, reference = crim_modified.test)
 cm$byClass
 ```
 
@@ -160,11 +160,11 @@ Poor results when we use all params.
 
 ```{r}
 # LDA: Model with parameters selected by lasso
-fit.lda <- lda(crim_median ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, subset = train)
+fit.lda <- lda(crim_modified ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, subset = train)
 pred.lda <- predict(fit.lda, Boston.test)
-table(pred.lda$class, crim_median.test)
-mean(pred.lda$class == crim_median.test)
-cm=confusionMatrix(data = pred.lda$class, reference = crim_median.test)
+table(pred.lda$class, crim_modified.test)
+mean(pred.lda$class == crim_modified.test)
+cm=confusionMatrix(data = pred.lda$class, reference = crim_modified.test)
 cm$byClass
 ```
 
@@ -172,11 +172,11 @@ Poor results when we use Lasso params. Logistic Reg performed better.
 
 ```{r}
 # LDA: Model with parameters selected by forward selection
-fit.lda <- lda(crim_median ~ rad + black + lstat, data = Boston, subset = train)
+fit.lda <- lda(crim_modified ~ rad + black + lstat, data = Boston, subset = train)
 pred.lda <- predict(fit.lda, Boston.test)
-table(pred.lda$class, crim_median.test)
-mean(pred.lda$class == crim_median.test)
-cm_lda=confusionMatrix(data = pred.lda$class, reference = crim_median.test)
+table(pred.lda$class, crim_modified.test)
+mean(pred.lda$class == crim_modified.test)
+cm_lda=confusionMatrix(data = pred.lda$class, reference = crim_modified.test)
 cm_lda$byClass
 ```
 
@@ -188,17 +188,17 @@ Moving to KNN.
 # KNN: Model with all parameters
 train.X <- cbind(zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, black, lstat, medv)[train, ]
 test.X <- cbind(zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, black, lstat, medv)[test, ]
-train.crim_median <- crim_median[train]
+train.crim_modified <- crim_modified[train]
 set.seed(1)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 1)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 10)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 100)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
 ```
 
 When using all params we get the best results when k =10
@@ -208,17 +208,17 @@ When using all params we get the best results when k =10
 # KNN: Model with parameters selected by lasso
 train.X <- cbind(zn, indus, chas, nox, rm, dis, rad, ptratio, black, lstat, medv)[train, ]
 test.X <- cbind(zn, indus, chas, nox, rm, dis, rad, ptratio, black, lstat, medv)[test, ]
-train.crim_median <- crim_median[train]
+train.crim_modified <- crim_modified[train]
 set.seed(1)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 1)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 10)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 100)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
 ```
 
 When using lasso params results are similar. The k=10 mean actually falls. 
@@ -227,103 +227,125 @@ When using lasso params results are similar. The k=10 mean actually falls.
 # KNN: Model with parameters selected by forward selection
 train.X <- cbind(rad, black, lstat)[train, ]
 test.X <- cbind(rad, black, lstat)[test, ]
-train.crim_median <- crim_median[train]
+train.crim_modified <- crim_modified[train]
 set.seed(1)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 1)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 10)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 100)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
 
 cm_lr$byClass
 cm_lda$byClass
 ```
 
-All in all it seems that the simple Logistic Regression model with parameters selected by forward selection performs best closely followed by LDA model with parameters selected by forward selection. 
+All in all it seems that the simple Logistic Regression model with parameters selected by forward selection performs best closely followed by LDA model with parameters selected by forward selection. One reason this is possible is that the underlying data has a relatively simple linear relationship with a few of the predictors. It doesn't have non-linearity and so with more flexible methods like KNN (and to a lesser extent LDA)
 
 ### 2. Now repeat the exercise but classify those neighborhoods in the bottom 10% percentile with lowest crime rates. What differences do you notice between this and the previous classification task (hint: look at the confusion matrix)? Why may it be deceiving to only look at misclassification rate? What other measures can you consider?
 
-We will setup the test and train data as described. The difference here will be that test data will only have 0 values for crime above or below median [always below]
 
 ```{r}
-test = which(Boston$crim <= quantile(Boston$crim, 0.1))
-train = which(Boston$crim > quantile(Boston$crim, 0.1))
+# reload data and do some data processing to prepare the categorical variable
+data(Boston)
+crim_modified <- rep(0, length(crim))
+crim_modified[which(Boston$crim <= quantile(Boston$crim, 0.1))] <- 1
 
-Boston.train <- Boston[train, ]
-Boston.test <- Boston[test, ]
-crim_median.test <- crim_median[test]
+# add new column to the data frame
+Boston <- data.frame(Boston, crim_modified)
+
+n=nrow(Boston)
+train = sample(seq(1:n),round(n * 0.75), replace = FALSE)
+test = setdiff(1:n, train)
+
+Boston.train = Boston[ train,]
+Boston.test = Boston[test,]
+crim_modified.test <- crim_modified[test]
+
+#test = which(Boston$crim <= quantile(Boston$crim, 0.1))
+#train = which(Boston$crim > quantile(Boston$crim, 0.1))
 
 # Logistic Regression: Model with all parameters
-fit.glm <- glm(crim_median ~ . - crim_median - crim, data = Boston, family = binomial, subset = train)
+fit.glm <- glm(crim_modified ~ . - crim_modified - crim, data = Boston, family = binomial, subset = train)
 probs <- predict(fit.glm, Boston.test, type = "response")
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
-conf_matrix = table(pred.glm, crim_median.test)
+conf_matrix = table(pred.glm, crim_modified.test)
 conf_matrix
-mean(pred.glm == crim_median.test)
+mean(pred.glm == crim_modified.test)
+cm=confusionMatrix(data = pred.glm, reference = crim_modified.test)
+cm$byClass
 ```
 
-We can see the problem right here that - the column for true positive is missing.  
-We classification rate is high and doesn't tell the complete story. We get that on seeing the confusion matrix.
+We can see the problem right here that - There are no predictions for '1'. The (mis)classification rate is high but doesn't tell the complete story. We have to look at Sensitivity, Specificity, Precision and Recall to get a complete picture. Lets continue:
 
 ```{r}
 # Logistic Regression: Model with parameters selected by lasso
-fit.glm <- glm(crim_median ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, family = binomial, subset = train)
+fit.glm <- glm(crim_modified ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, family = binomial, subset = train)
 probs <- predict(fit.glm, Boston.test, type = "response")
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
-table(pred.glm, crim_median.test)
-mean(pred.glm == crim_median.test)
+table(pred.glm, crim_modified.test)
+mean(pred.glm == crim_modified.test)
+cm=confusionMatrix(data = pred.glm, reference = crim_modified.test)
+cm$byClass
 
 ```
 
-Results similar to when we use all params.
+Results similar to when we use all params= but slightly better. Note that Specificity is still almost 0.
 
 ```{r}
 # Logistic Regression: Model with parameters selected by forward selection
-fit.glm <- glm(crim_median ~ rad + black + lstat, data = Boston, family = binomial, subset = train)
+fit.glm <- glm(crim_modified ~ rad + black + lstat, data = Boston, family = binomial, subset = train)
 probs <- predict(fit.glm, Boston.test, type = "response")
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
-table(pred.glm, crim_median.test)
-mean(pred.glm == crim_median.test)
+table(pred.glm, crim_modified.test)
+mean(pred.glm == crim_modified.test)
+cm=confusionMatrix(data = pred.glm, reference = crim_modified.test)
+cm$byClass
 ```
 
-This model classifies all test rows correctly and we see that the confusion matrix has a single entry.
+Same issue persists. Moving to LDA:
 
 ```{r}
 # LDA: Model with all parameters
-fit.lda <- lda(crim_median ~ . - crim_median  - crim, data = Boston, subset = train)
+fit.lda <- lda(crim_modified ~ . - crim_modified  - crim, data = Boston, subset = train)
 pred.lda <- predict(fit.lda, Boston.test)
-table(pred.lda$class, crim_median.test)
-mean(pred.lda$class == crim_median.test)
+table(pred.lda$class, crim_modified.test)
+mean(pred.lda$class == crim_modified.test)
+cm=confusionMatrix(data = pred.lda$class, reference = crim_modified.test)
+cm$byClass
 ```
 
-This model classifies all test rows correctly.
+Slightly better but specificity is still almost 0.
 
 ```{r}
 # LDA: Model with parameters selected by lasso
-fit.lda <- lda(crim_median ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, subset = train)
+fit.lda <- lda(crim_modified ~ zn + indus + chas + nox + rm + dis + rad + ptratio + black + lstat + medv, data = Boston, subset = train)
 pred.lda <- predict(fit.lda, Boston.test)
-table(pred.lda$class, crim_median.test)
-mean(pred.lda$class == crim_median.test)
+table(pred.lda$class, crim_modified.test)
+mean(pred.lda$class == crim_modified.test)
+cm=confusionMatrix(data = pred.lda$class, reference = crim_modified.test)
+cm$byClass
 ```
 
-This model classifies all test rows correctly.
+Virtually same as the LDA with all params.
 
 ```{r}
 # LDA: Model with parameters selected by forward selection
-fit.lda <- lda(crim_median ~ rad + black + lstat, data = Boston, subset = train)
+fit.lda <- lda(crim_modified ~ rad + black + lstat, data = Boston, subset = train)
 pred.lda <- predict(fit.lda, Boston.test)
-table(pred.lda$class, crim_median.test)
-mean(pred.lda$class == crim_median.test)
+table(pred.lda$class, crim_modified.test)
+mean(pred.lda$class == crim_modified.test)
+cm=confusionMatrix(data = pred.lda$class, reference = crim_modified.test)
+cm$byClass
 ```
 
-Simplest model also classified everything correctly. For LR simplest model performed the best. For LDA all performed fine.
+We continue to see the same issue.
 
 Moving to KNN.
 
@@ -331,57 +353,84 @@ Moving to KNN.
 # KNN: Model with all parameters
 train.X <- cbind(zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, black, lstat, medv)[train, ]
 test.X <- cbind(zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, black, lstat, medv)[test, ]
-train.crim_median <- crim_median[train]
+train.crim_modified <- crim_modified[train]
 set.seed(1)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 1)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
 ```
 
-When using all params all classified correctly for all k.
+The results have improved substantially as the specificity is now giving decent results. Continue further:
+
+```{r}
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 10)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
+
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 100)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
+```
+
+We had deccent results with k=1 and k=10. However with k=100 we have tjhe old issue of having specificity almost or exactly 0
 
 ```{r}
 
 # KNN: Model with parameters selected by lasso
 train.X <- cbind(zn, indus, chas, nox, rm, dis, rad, ptratio, black, lstat, medv)[train, ]
 test.X <- cbind(zn, indus, chas, nox, rm, dis, rad, ptratio, black, lstat, medv)[test, ]
-train.crim_median <- crim_median[train]
+train.crim_modified <- crim_modified[train]
 set.seed(1)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 1)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
+```
+Again we see results getting better.
+
+```{r}
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 10)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 100)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
 ```
 
-When using lasso params k=100 peformed best. Othe vlaues of k classified a few incorrectly. 
+We had deccent results with k=1 and k=10. However with k=100 we have tjhe old issue of having specificity almost or exactly 0
 
 ```{r}
 # KNN: Model with parameters selected by forward selection
 train.X <- cbind(rad, black, lstat)[train, ]
 test.X <- cbind(rad, black, lstat)[test, ]
-train.crim_median <- crim_median[train]
+train.crim_modified <- crim_modified[train]
 set.seed(1)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 1)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 10)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-pred.knn <- knn(train.X, test.X, train.crim_median, k = 100)
-table(pred.knn, crim_median.test)
-mean(pred.knn == crim_median.test)
-
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 1)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 10)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
+pred.knn <- knn(train.X, test.X, train.crim_modified, k = 100)
+table(pred.knn, crim_modified.test)
+mean(pred.knn == crim_modified.test)
+cm=confusionMatrix(data = pred.knn, reference = crim_modified.test)
+cm$byClass
 ```
 
-When using forward selection params all classified incorrectly for all k.
+In summary we got the best results with all parameters and using k=1
