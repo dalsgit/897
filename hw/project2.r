@@ -1,18 +1,62 @@
-#setwd("C:\\study\\897\\hw")
-setwd("C:\\study\\psu\\git\\897\\hw") 
+setwd("C:\\study\\897\\hw")
+#setwd("C:\\study\\psu\\git\\897\\hw") 
 
 library(MASS)
 library(class)
 library(glmnet)
 library(leaps)
 library(caret)
+library(ggplot2)
+library(tidyverse)
+
+#+++++++++ FUNCTIONS
+naisnone= c("Pool.QC", "Misc.Feature", "Alley", "Bsmt.Qual", "Bsmt.Cond", 
+            "Bsmt.Exposure", "BsmtFin.Type.1", "BsmtFin.Type.2", "Fireplace.Qu", 
+            "Garage.Type", "Garage.Finish", "Garage.Qual", "Garage.Cond", "Fence")
+
+none= function(data, var){
+  levels(data[, var]) <- c(levels(data[, var]), "none")
+  data[, var][is.na(data[, var])] <- "none"
+  return(data[, var])
+}
+
+bar_missing = function(x){
+  library(dplyr)
+  library(reshape2)
+  x %>%
+    is.na %>%
+    melt %>%
+    ggplot(data = .,
+           aes(x = Var2)) +
+    geom_bar(aes(y=(..count..),fill=value),alpha=0.7,color="black")+scale_fill_manual(values=c("gold","red3"),name = "",
+                                                                                      labels = c("Available","Missing"))+
+    theme_minimal()+
+    theme(axis.text.x = element_text(angle=45, vjust=0.5)) +
+    labs(x = "Variables in Dataset",
+         y = "Observations")+coord_flip()
+}
+
+#-------------------
 
 df = read.csv("proj2_amesHousing.txt", sep = "\t")
 attach(df)
 
 dim(df)
 #remove columns we dont need for the model
-df = df[ , -which(ndf(df) %in% c("Order","PID"))]
+df = df[ , -which(names(df) %in% c("Order","PID"))]
+dim(df)
+
+#for easy looking, let's plot them separately in factor and numeric data set
+#numeric data set
+num = sapply(df, is.numeric)
+numdat= df [, num]
+numdat%>%bar_missing()
+
+#factor data set
+fac= sapply(df, is.factor)
+facdat= df [, fac]
+facdat%>%bar_missing()
+
 
 # first check and clean the data
 # Are there any missing values in the data
@@ -24,13 +68,36 @@ na.cols = which(colSums(is.na(df)) > 0)
 # Break down missing values by variable
 sort(colSums(sapply(df[na.cols], is.na)), decreasing = TRUE)
 
-## pool.qc is missing values - could be for no pool, lets check
-df[(df$Pool.Area > 0) & is.na(df$Pool.QC), c('Pool.QC','Pool.Area')]
-# above is true, convert NA to No Pool
-index <- which(is.na(df$pool.qc))
-df[index, 'pool.qc'] <- 'No Pool'
+#Based on data discription, some of Na's value just mean "house doesn't have it " (not really missing value, just wrong label).So, I will do label those variables in right their categories.
+for (i in 1:length(naisnone)){
+  df[, naisnone[i]]<- none(df, naisnone[i]) 
+}
+sum(is.na(df))
 
-table(df$MS.Zoning) 
+#"GarageYrBlt". It is logical that the garages were built same time with the houses. How GarageYrBlt and YearBuilt of the houses looks like
+length(which(df$Garage.Yr.Blt == df$Year.Built)) / dim(df)[1]
+idx <- which(is.na(df$Garage.Yr.Blt))
+df[idx, "Garage.Yr.Blt"] <- df[idx, "Year.Built"]
+
+#MasVnrType (Masonry veneer type) & MasVnrArea (Masonry veneer area in square feet) are related to each other
+table(Mas.Vnr.Type)
+df[(is.na(df$Mas.Vnr.Type)) | (is.na(df$Mas.Vnr.Area)), c("Mas.Vnr.Type", "Mas.Vnr.Area")]
+count(df[(is.na(Mas.Vnr.Type)) | (is.na(Mas.Vnr.Area)), c("Mas.Vnr.Type", "Mas.Vnr.Area")])
+df$Mas.Vnr.Type[Mas.Vnr.Type==''] = "None"
+df$Mas.Vnr.Area[is.na(df$Mas.Vnr.Area)] = 0
+df[(is.na(df$Mas.Vnr.Type)) | (is.na(df$Mas.Vnr.Area)), c("Mas.Vnr.Type", "Mas.Vnr.Area")]
+
+
+#near-zero-variance
+nzv.data = nearZeroVar(df, saveMetrics = TRUE)
+drop.cols = rownames(nzv.data)[nzv.data$nzv == TRUE]
+df = df[,!names(df) %in% drop.cols]
+dim(df)
+
+#linearly dependent columns
+lin= findLinearCombos(df)
+fidat= fidat[, -c(lin$remove)]
+paste("Number of linearly dependent columns : ", length(lin$remove))
 
 ## Lot Frontage
 summary(df$Lot.Frontage)
