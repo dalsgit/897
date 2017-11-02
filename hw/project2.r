@@ -1,13 +1,14 @@
 setwd("C:\\study\\897\\hw")
 #setwd("C:\\study\\psu\\git\\897\\hw") 
 
-library(MASS)
+suppressWarnings(library(MASS))
 library(class)
 library(glmnet)
 library(leaps)
 library(caret)
 library(ggplot2)
 library(tidyverse)
+library(corrplot)
 
 #+++++++++ FUNCTIONS
 naisnone= c("Pool.QC", "Misc.Feature", "Alley", "Bsmt.Qual", "Bsmt.Cond", 
@@ -39,9 +40,13 @@ bar_missing = function(x){
 #-------------------
 
 df = read.csv("proj2_amesHousing.txt", sep = "\t")
-attach(df)
 
+# drop the rows that are outliers as explained in the data description
+plot(df$SalePrice, df$Gr.Liv.Area)
+df <- df[Gr.Liv.Area<=4000,]
+plot(df$SalePrice, df$Gr.Liv.Area)
 dim(df)
+
 #remove columns we dont need for the model
 df = df[ , -which(names(df) %in% c("Order","PID"))]
 dim(df)
@@ -87,6 +92,23 @@ df$Mas.Vnr.Type[Mas.Vnr.Type==''] = "None"
 df$Mas.Vnr.Area[is.na(df$Mas.Vnr.Area)] = 0
 df[(is.na(df$Mas.Vnr.Type)) | (is.na(df$Mas.Vnr.Area)), c("Mas.Vnr.Type", "Mas.Vnr.Area")]
 
+# square footage - basement and living areas
+count(df[Total.Bsmt.SF!=BsmtFin.SF.1+BsmtFin.SF.2+Bsmt.Unf.SF,c("Bsmt.Unf.SF","BsmtFin.SF.1","BsmtFin.SF.2","Total.Bsmt.SF")])
+df[Gr.Liv.Area!=X1st.Flr.SF+X2nd.Flr.SF+Low.Qual.Fin.SF,c("X1st.Flr.SF","X2nd.Flr.SF","Low.Qual.Fin.SF","Gr.Liv.Area")]
+
+# Merge the square footage (basement, 1st and 2nd floors) and remove columns
+df$tot.sqft <- df$Total.Bsmt.SF + df$Gr.Liv.Area
+df = df[ , -which(names(df) %in% c("Bsmt.Unf.SF","Gr.Liv.Area"))]
+
+# Delete the columns LotFrontage - many missing values
+df = df[ , -which(names(df) %in% c("Lot.Frontage"))]
+
+sum(is.na(df))
+na.rows = which(rowSums(is.na(df)) > 0)
+df <- df[-c(1342,1498,2237),]
+dim(df)
+
+# At this point we dont have any missing values in the data frame
 
 #near-zero-variance
 nzv.data = nearZeroVar(df, saveMetrics = TRUE)
@@ -94,34 +116,23 @@ drop.cols = rownames(nzv.data)[nzv.data$nzv == TRUE]
 df = df[,!names(df) %in% drop.cols]
 dim(df)
 
-#linearly dependent columns
-lin= findLinearCombos(df)
-fidat= fidat[, -c(lin$remove)]
-paste("Number of linearly dependent columns : ", length(lin$remove))
-
-## Lot Frontage
-summary(df$Lot.Frontage)
-index <- which(is.na(df$Lot.Frontage))
-head(df[index,])
-
 ## Neighborhood
 table(df$Neighborhood)
 # GrnHill and Landmrk neighborhoods have very less representation. removing these rows
-df <-  filter(Neighborhood != "GrnHill" & Neighborhood != "Landmrk")
+# df <-  filter(Neighborhood != "GrnHill" & Neighborhood != "Landmrk")
 
 n=nrow(df)
 set.seed(7736)
-test = sample(2930, round(2930/4)) ## train indices are the rest
+test = sample(n, round(n/4)) ## train indices are the rest
 train = setdiff(1:n, test)
 
 df.train = df[ train,]
 df.test = df[test,]
-sp_modified.test <- sp_modified[test]
 
 # Let's start with parameter selection for the Boston data set. 
 # We will use forward selection, lasso and ridge here:
 
-x = model.matrix(sp_modified ~ . - 1, data = df)
+x = model.matrix(SalePrice ~ . - 1, data = df)
 y = df$SalePrice
 
 p = ncol(df) - 1
@@ -144,9 +155,9 @@ cv.lasso = cv.glmnet(x, y, type.measure = "mse", nfolds=10)
 plot(cv.lasso)
 bestlam.lasso=cv.lasso$lambda.min #find the best tuning parameter
 
-fit.lasso <- glmnet(train.mat, train$crim, alpha = 1, lambda = grid, thresh = 1e-12)
+fit.lasso <- glmnet(train.mat, df.train$SalePrice, alpha = 1, lambda = grid, thresh = 1e-12)
 pred.lasso=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
-mean(( pred.lasso - test$crim)^2)
+mean(( pred.lasso - df.test$SalePrice)^2)
 
 final.lasso=glmnet(x,y,alpha=1) #fit on the entire data set to extract coef
 lasso.coef=predict(final.lasso,type="coefficients",s=bestlam.lasso)[1:14,]
