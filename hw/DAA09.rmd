@@ -13,7 +13,7 @@ In this assignment we will use the Boston data found in the MASS library.
 
 ### 1. Fit classification models in order to predict whether a given suburb has a crime rate above or below the median. Explore logistic regression, LDA, and KNN models using various subsets of the predictors. At this point in the class, you should feel fairly comfortable making such an open-ended exploration.
 
-### Describe your findings, show appropriate results, and determine why some techniques perform better or worse and whic had the best performance.
+### Describe your findings, show appropriate results, and determine why some techniques perform better or worse and which had the best performance.
 
 ```{r}
 library(MASS)

@@ -105,10 +105,14 @@ df = df[ , -which(names(df) %in% c("Lot.Frontage"))]
 
 sum(is.na(df))
 na.rows = which(rowSums(is.na(df)) > 0)
-df <- df[-c(1342,1498,2237),]
+df <- df[-c(na.rows),]
 dim(df)
 
 # At this point we dont have any missing values in the data frame
+num = sapply(df, is.numeric)
+numdat= df [, num]
+corr.matrix = cor(numdat)
+corrplot.mixed(corr.matrix)
 
 #near-zero-variance
 nzv.data = nearZeroVar(df, saveMetrics = TRUE)
@@ -141,13 +145,23 @@ train.mat <- model.matrix(SalePrice~ ., data = df.train)
 test.mat <- model.matrix(SalePrice~ ., data = df.test)
 
 # Forward Selection | BIC
-regfit.fwd=regsubsets (SalePrice~.,data=df.train, nvmax =79, method='forward')
+regfit.fwd=regsubsets (SalePrice~.,data=df.train, nvmax=p, method='forward')
 reg.summary = summary (regfit.fwd)
 reg.summary
 plot(reg.summary$bic, xlab ="Number of Variables",ylab="BIC", type = 'l', main = 'Forward Step - Performance Measure')
 which.min (reg.summary$bic )
 points (which.min (reg.summary$bic ), reg.summary$bic[which.min (reg.summary$bic )], col ="red",cex =2, pch =20)
 
+# Best model
+regfit.best=regsubsets (SalePrice~.,data=df.train, nvmax=p, really.big = T)
+test.mat=model.matrix (SalePrice~.,data=df.test)
+test.val.errors =rep(NA ,p)
+for(i in 1:17){
+  coefi=coef(regfit.best ,id=i)
+  pred=test.mat [,names(coefi)] %*% coefi
+  test.val.errors [i]= mean(( df.test$SalePrice-pred)^2)
+}
+plot(test.val.errors ,type='b', xlab='# of parameters', ylab='Test MSE')
 
 #LASSO
 grid =10^ seq (10,-2, length =100)
