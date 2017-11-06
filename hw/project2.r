@@ -1,3 +1,10 @@
+# ---
+# title: "Stat 897 Fall 2017 Project 2"
+# author: "Daljeet Singh"
+# date: "Due November 8, 2017"
+# output: pdf_document
+# ---
+  
 #setwd("C:\\study\\897\\hw")
 setwd("C:\\study\\psu\\git\\897\\hw") 
 
@@ -132,7 +139,6 @@ df[idx, "Garage.Yr.Blt"] <- 0
 # do we have condition where garage is before the house - change garage date = year built 
 df[(df$Garage.Yr.Blt < df$Year.Built && df$Garage.Type != "none"), c("Garage.Yr.Blt", "Year.Built")]
 
-
 #MasVnrType (Masonry veneer type) & MasVnrArea (Masonry veneer area in square feet) are related to each other
 table(df$Mas.Vnr.Type)
 df[(is.na(df$Mas.Vnr.Type)) | (is.na(df$Mas.Vnr.Area)), c("Mas.Vnr.Type", "Mas.Vnr.Area")]
@@ -158,6 +164,8 @@ na.cols = which(colSums(is.na(df)) > 0)
 sort(colSums(sapply(df[na.cols], is.na)), decreasing = TRUE)
 
 # Delete the columns LotFrontage - many missing values
+490/nrow(df)
+plot(df$SalePrice, df$Lot.Frontage)
 df = df[ , -which(names(df) %in% c("Lot.Frontage"))]
 
 sum(is.na(df))
@@ -177,6 +185,8 @@ corr.matrix = cor(numdat)
 #dim(df)
 
 ## Neighborhood
+lm=lm(SalePrice ~ Neighborhood, data=df)
+summary(lm)
 table(df$Neighborhood)
 # GrnHill and Landmrk neighborhoods have very less representation. removing these rows
 df <- df[!(df$Neighborhood == "GrnHill" | df$Neighborhood == "Landmrk"),]
@@ -210,12 +220,7 @@ train = setdiff(1:n, test)
 df.train = df[ train,]
 df.test = df[test,]
 
-# Let's start with parameter selection for the Boston data set. 
-# We will use forward selection, lasso and ridge here:
-
-x = model.matrix(sp_modified ~ ., data = df)
-p = ncol(df) - 1
-
+x <- model.matrix(sp_modified~ ., data = df)
 train.mat <- model.matrix(sp_modified~ ., data = df.train)
 test.mat <- model.matrix(sp_modified~ ., data = df.test)
 
@@ -253,13 +258,15 @@ which.min (reg.summary$cp )
 points (which.min (reg.summary$cp), reg.summary$cp[which.min (reg.summary$cp)], col ="red",cex =2, pch =20)
 
 
-#LASSO
+# LASSO / Penalized Logistic Regression
 grid =10^ seq (10,-2, length =100)
-cv.lasso = cv.glmnet(x, y=as.factor(df$sp_modified), family="binomial",type.measure = "mse", nfolds=10)
+cv.lasso = cv.glmnet(x, y=as.factor(df$sp_modified), family="binomial",
+                     type.measure = "mse", nfolds=10)
 plot(cv.lasso)
 bestlam.lasso=cv.lasso$lambda.min #find the best tuning parameter
 
-fit.lasso <- glmnet(train.mat, y=as.factor(df.train$sp_modified), alpha=1, family="binomial", lambda = grid, thresh = 1e-12)
+fit.lasso <- glmnet(train.mat, y=as.factor(df.train$sp_modified), alpha=1, 
+                    family="binomial", lambda = grid, thresh = 1e-12)
 plot(fit.lasso, xvar="lambda")
 #fit.lasso <- glmnet(train.mat, df.train$SalePrice, alpha = 1, lambda = grid, thresh = 1e-12)
 probs=predict (fit.lasso, s=bestlam.lasso, newx=test.mat)
@@ -271,6 +278,9 @@ cm=confusionMatrix(data = pred.glm, reference = df.test$sp_modified)
 cm$byClass
 
 lasso.coef=predict(fit.lasso,type="coefficients",s=bestlam.lasso)
+lasso.coef=lasso.coef[1:length(lasso.coef),]
+length(lasso.coef[lasso.coef !=0])
+lasso.coef[lasso.coef!=0]
 
 final.lasso=glmnet(x,y=as.factor(df$sp_modified),alpha=1,family = "binomial") #fit on the entire data set to extract coef
 lasso.coef=predict(final.lasso,type="coefficients",s=bestlam.lasso)
@@ -280,11 +290,13 @@ names(lasso.coef[lasso.coef!=0])
 
 
 #Ridge regression
-cv.ridge = cv.glmnet(x, y=as.factor(df$sp_modified), alpha=0, type.measure="mse", family="binomial", nfolds=10,grouped=FALSE)
+cv.ridge = cv.glmnet(x, y=as.factor(df$sp_modified), alpha=0, type.measure="mse", 
+                     family="binomial", nfolds=10,grouped=FALSE)
 plot(cv.ridge)
 bestlam.ridge=cv.ridge$lambda.min #find the best tuning parameter
 
-fit.ridge =glmnet(train.mat, y=as.factor(df.train$sp_modified), family="binomial", alpha=0, lambda=grid, thresh=1e-12)
+fit.ridge =glmnet(train.mat, y=as.factor(df.train$sp_modified), family="binomial", 
+                  alpha=0, lambda=grid, thresh=1e-12)
 probs = predict (fit.ridge, s=bestlam.ridge, newx=test.mat)
 pred.glm <- rep(0, length(probs))
 pred.glm[probs > 0.5] <- 1
@@ -292,26 +304,50 @@ conf_matrix = table(pred.glm, df.test$sp_modified)
 conf_matrix
 cm=confusionMatrix(data = pred.glm, reference = df.test$sp_modified)
 cm$byClass
+ridge.coef=predict(fit.ridge,type="coefficients",s=bestlam.ridge)
+ridge.coef=ridge.coef[1:length(ridge.coef),]
+length(ridge.coef[ridge.coef !=0])
+ridge.coef[ridge.coef!=0]
 
 final.ridge=glmnet(x,y,alpha=0) #fit on the full data
-ridge.coef=predict(final.ridge,type="coefficients",s=bestlam.ridge)[1:14,]
-ridge.coef
-ridge.coef[ridge.coef!=0] #contains all variables in our model
+ridge.coef=predict(final.ridge,type="coefficients",s=bestlam.ridge)
+ridge.coef=lasso.coef[1:length(ridge.coef),]
+length(ridge.coef[ridge.coef !=0])
+names(ridge.coef[ridge.coef!=0])
 
-# KNN with CV
-# all variables left after cleaning
-pred.knn <- knn(train.mat, test.mat, df.train$sp_modified, k = 1)
-table(pred.knn, df.test$sp_modified)
-mean(pred.knn == df.test$sp_modified)
-cm=confusionMatrix(data = pred.knn, reference = df.test$sp_modified)
+
+# KNN with CV - all variables left after cleaning
+fit.knn = pred.knn = vector("list", 20)
+vmse.knn = rep(NA, 20)
+for (k in 1:20){ ## set k from 1 to 20
+  fit.knn[[k]] = knn(train.mat, test.mat, df.train$sp_modified, k = k)
+  pred.knn[[k]] = as.numeric(fit.knn[[k]]) - 1
+  vmse.knn[k] = mean(abs(df.test$sp_modified - pred.knn[[k]]))
+}
+### misclassification rate for each k from 1 to 20
+plot(vmse.knn, type = 'b', col = 'red', pch = 20, xlab = 'k', ylab = 'mse of KNN')
+table(pred.knn[[which.min(vmse.knn)]], df.test$sp_modified)
+mean(pred.knn[[which.min(vmse.knn)]] == df.test$sp_modified)
+cm=confusionMatrix(data = pred.knn[[which.min(vmse.knn)]], reference = df.test$sp_modified)
 cm$byClass
 
-#Overall.Qual+Exterior.1st+Foundation+Total.Bath+Overall.Cond+Exterior.2nd+Bsmt.Qual+Kitchen.Qual+tot.sqft+Neighborhood+Condition.1+Year.Remod.Add+Bsmt.Exposure+Functional+Open.Porch.SF+Lot.Shape+Condition.2+Exter.Qual+BsmtFin.Type.1+Fireplaces+Garage.Area+ln.Lot.Area
-train.mat <- model.matrix(sp_modified~ Overall.Qual+Exterior.1st+Foundation+Total.Bath+Overall.Cond+Exterior.2nd+Bsmt.Qual+Kitchen.Qual+tot.sqft+Neighborhood+Condition.1+Year.Remod.Add+Bsmt.Exposure+Functional+Open.Porch.SF+Lot.Shape+Condition.2+Exter.Qual+BsmtFin.Type.1+Fireplaces+Garage.Area+ln.Lot.Area, data = df.train)
-test.mat <- model.matrix(sp_modified~ Overall.Qual+Exterior.1st+Foundation+Total.Bath+Overall.Cond+Exterior.2nd+Bsmt.Qual+Kitchen.Qual+tot.sqft+Neighborhood+Condition.1+Year.Remod.Add+Bsmt.Exposure+Functional+Open.Porch.SF+Lot.Shape+Condition.2+Exter.Qual+BsmtFin.Type.1+Fireplaces+Garage.Area+ln.Lot.Area, data = df.test)
 
-pred.knn <- knn(train.mat, test.mat, df.train$sp_modified, k = 1)
-table(pred.knn, df.test$sp_modified)
-mean(pred.knn == df.test$sp_modified)
-cm=confusionMatrix(data = pred.knn, reference = df.test$sp_modified)
+#Pool.QC + Sale.Type + Roof.Style + Roof.Matl + Fireplace.Qu + Alley + Overall.Qual + Exterior.1st + Foundation + Total.Bath + Overall.Cond + Exterior.2nd + Bsmt.Qual + Kitchen.Qual + tot.sqft + Neighborhood + Condition.1 + Year.Remod.Add + Bsmt.Exposure + Open.Porch.SF + Condition.2 + Exter.Qual + BsmtFin.Type.1 + Fireplaces + Garage.Area + ln.Lot.Area
+train.lasso.mat <- model.matrix(sp_modified~ Pool.QC + Sale.Type + Roof.Style + Roof.Matl + Fireplace.Qu + Alley + Overall.Qual + Exterior.1st + Foundation + Total.Bath + Overall.Cond + Exterior.2nd + Bsmt.Qual + Kitchen.Qual + tot.sqft + Neighborhood + Condition.1 + Year.Remod.Add + Bsmt.Exposure + Open.Porch.SF + Condition.2 + Exter.Qual + BsmtFin.Type.1 + Fireplaces + Garage.Area + ln.Lot.Area, data = df.train)
+test.lasso.mat <- model.matrix(sp_modified~ Pool.QC + Sale.Type + Roof.Style + Roof.Matl + Fireplace.Qu + Alley + Overall.Qual + Exterior.1st + Foundation + Total.Bath + Overall.Cond + Exterior.2nd + Bsmt.Qual + Kitchen.Qual + tot.sqft + Neighborhood + Condition.1 + Year.Remod.Add + Bsmt.Exposure + Open.Porch.SF + Condition.2 + Exter.Qual + BsmtFin.Type.1 + Fireplaces + Garage.Area + ln.Lot.Area, data = df.test)
+
+# KNN with CV - all variables left after cleaning
+fit.knn = pred.knn = vector("list", 20)
+vmse.knn = rep(NA, 20)
+for (k in 1:20){ ## set k from 1 to 20
+  fit.knn[[k]] = knn(train.lasso.mat, test.lasso.mat, df.train$sp_modified, k = k)
+  pred.knn[[k]] = as.numeric(fit.knn[[k]]) - 1
+  vmse.knn[k] = mean(abs(df.test$sp_modified - pred.knn[[k]]))
+}
+### misclassification rate for each k from 1 to 20
+plot(vmse.knn, type = 'b', col = 'red', pch = 20, xlab = 'k', ylab = 'mse of KNN')
+table(pred.knn[[which.min(vmse.knn)]], df.test$sp_modified)
+mean(pred.knn[[which.min(vmse.knn)]] == df.test$sp_modified)
+cm=confusionMatrix(data = pred.knn[[which.min(vmse.knn)]], reference = df.test$sp_modified)
 cm$byClass
+
