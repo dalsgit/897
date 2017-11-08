@@ -10,13 +10,260 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 In this assignment we will use the OJ data found in the ISLR library.
+```{r}
+library(ISLR)
+library(e1071)
+library(caret)
+library(knitr)
+
+data("OJ")
+str(OJ)
+```
+
+We see that Purchase has 2 levels and we proceed to apply SVM on the data set.
 
 ## (a) Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+```{r}
+set.seed(35)
+train=sample(nrow(OJ),800)
+OJ.train = OJ[train,]
+OJ.test = OJ[-train,]
+```
 ## (b) Fit a support vector classifier to the training data using cost=0.01, with Purchase as the response and the other variables as predictors. Use the summary() function to produce summary statistics, and describe the results obtained.
+
+A support vector classifier would mean that we run svm with kernel=linear
+```{r}
+svm_l = svm(Purchase~.,data=OJ.train,kernel="linear",cost=0.01)
+summary(svm_l)
+
+```
+
+The summary tells us that the model selects 426 out of 800 observations as support points. The two levels contribute 214 and 212 data points.
+
+
 ## (c) What are the training and test error rates?
+```{r}
+# Training Error
+pred.train = predict(svm_l, newdata=OJ.train)
+table(pred=pred.train, truth=OJ.train$Purchase)
+cm=confusionMatrix(data = pred.train, reference = OJ.train$Purchase)
+cm$byClass
+mean(pred.train == OJ.train$Purchase)
+
+# Test Error
+pred.test = predict(svm_l,newdata=OJ.test)
+table(pred=pred.test, truth=OJ.test$Purchase)
+cm=confusionMatrix(data = pred.test, reference = OJ.test$Purchase)
+cm$byClass
+mean(pred.test == OJ.test$Purchase)
+
+
+```
+
+In summary we see the following results for linear kernel:
+
+                Training        Test
+Mean            0.835           0.8111111
+Sensitivity     0.8800813       0.9130435
+Specificity     0.7629870       0.6605505
+Precision       0.8557312       0.7989130
+
+We see that while the sensitivity is slightly higher, the overall accuracy drops for the test data as compared to the training data.
+
 ## (d) Use the tune() function to select an optimal cost. Consider values in the range 0.01 to 10.
+
+```{r}
+set.seed(35)
+cost_range = c(.01, .02, .03, .05, .2, .4, .7, 1,2,3,4,5,6,7,8,9,10)
+
+tune.out = tune(svm, Purchase~., data=OJ.train, kernel="linear",  ranges=list(cost=cost_range))
+summary(tune.out)
+```
+
+From the results we can say that the optimal results are achieved when cost=0.03. We get error: 0.16
+
 ## (e) Compute the training and test error rates using this new value for cost.
+```{r}
+bestmod =tune.out$best.model
+summary (bestmod )
+
+# Training Error
+pred.train = predict(bestmod, newdata=OJ.train)
+table(pred=pred.train, truth=OJ.train$Purchase)
+cm=confusionMatrix(data = pred.train, reference = OJ.train$Purchase)
+cm$byClass
+mean(pred.train == OJ.train$Purchase)
+
+# Test Error
+pred.test = predict(bestmod,newdata=OJ.test)
+table(pred=pred.test, truth=OJ.test$Purchase)
+cm=confusionMatrix(data = pred.test, reference = OJ.test$Purchase)
+cm$byClass
+mean(pred.test == OJ.test$Purchase)
+```
+In summary we see the following results for bestmodel that uses linear kernel:
+
+                Training        Test
+Mean            0.84            0.8111111
+Sensitivity     0.8821138       0.9068323
+Specificity     0.7727273       0.6697248
+Precision       0.8611111       0.8021978
+
+
 ## (f) Repeat parts (b) through (e) using a support vector machine with a radial kernel. Use the default value for gamma.
+```{r}
+# b. SVM with radial kernel and cost=0.01
+svm_r = svm(Purchase~.,data=OJ.train,kernel="radial",cost=0.01)
+summary(svm_r)
+```
+The summary tells us that the model selects 617 out of 800 observations as support points. The two levels contribute 309 and 308 data points.
+
+```{r}
+# c. Training and test error rates
+# Training Error
+pred.train = predict(svm_r, newdata=OJ.train)
+table(pred=pred.train, truth=OJ.train$Purchase)
+cm=confusionMatrix(data = pred.train, reference = OJ.train$Purchase)
+cm$byClass
+mean(pred.train == OJ.train$Purchase)
+
+# Test Error
+pred.test = predict(svm_r,newdata=OJ.test)
+table(pred=pred.test, truth=OJ.test$Purchase)
+cm=confusionMatrix(data = pred.test, reference = OJ.test$Purchase)
+cm$byClass
+mean(pred.test == OJ.test$Purchase)
+```
+
+In summary we see the following results for radial kernel:
+
+                Training        Test
+Mean            0.615           0.5962963
+Sensitivity     1.0000000       1.0000000
+Specificity     0.0000000       0.0000000
+Precision       0.6150000       0.5962963
+
+The results have become worse.
+
+```{r}
+# d. tune on radial
+cost_range = c(.01, .02, .03, .05, .2, .4, .7, 1,2,3,4,5,6,7,8,9,10)
+set.seed(35)
+tune.out = tune(svm, Purchase~., data=OJ.train, kernel="radial",  ranges=list(cost=cost_range))
+summary(tune.out)
+
+```
+From the results we can say that the optimal results are achieved when cost=1. We get error: 0.1625
+
+```{r}
+# e. training and test error rates using best model
+bestmod =tune.out$best.model
+summary (bestmod )
+
+# Training Error
+pred.train = predict(bestmod, newdata=OJ.train)
+table(pred=pred.train, truth=OJ.train$Purchase)
+cm=confusionMatrix(data = pred.train, reference = OJ.train$Purchase)
+cm$byClass
+mean(pred.train == OJ.train$Purchase)
+
+# Test Error
+pred.test = predict(bestmod,newdata=OJ.test)
+table(pred=pred.test, truth=OJ.test$Purchase)
+cm=confusionMatrix(data = pred.test, reference = OJ.test$Purchase)
+cm$byClass
+mean(pred.test == OJ.test$Purchase)
+```
+In summary we see the following results for bestmodel that uses radial kernel:
+
+                Training        Test
+Mean            0.8575          0.8074074
+Sensitivity     0.9166667       0.9130435
+Specificity     0.7629870       0.6513761
+Precision       0.8606870       0.7945946
+
 ## (g) Repeat parts (b) through (e) using a support vector machine with a polynomial kernel.  Set degree=2.
+```{r}
+# b. SVM with polynomial kernel and cost=0.01
+svm_p = svm(Purchase~.,data=OJ.train,kernel="polynomial", degree=2,cost=0.01)
+summary(svm_p)
+```
+The summary tells us that the model selects 620 out of 800 observations as support points. The two levels contribute 312 and 308 data points.
+
+```{r}
+# c. Training and test error rates
+# Training Error
+pred.train = predict(svm_p, newdata=OJ.train)
+table(pred=pred.train, truth=OJ.train$Purchase)
+cm=confusionMatrix(data = pred.train, reference = OJ.train$Purchase)
+cm$byClass
+mean(pred.train == OJ.train$Purchase)
+
+# Test Error
+pred.test = predict(svm_p,newdata=OJ.test)
+table(pred=pred.test, truth=OJ.test$Purchase)
+cm=confusionMatrix(data = pred.test, reference = OJ.test$Purchase)
+cm$byClass
+mean(pred.test == OJ.test$Purchase)
+
+```
+
+In summary we see the following results for polynomial kernel:
+
+                Training         Test
+Mean            0.63             0.5962963
+Sensitivity     0.99796748       1.0000000
+Specificity     0.04220779       0.0000000
+Precision       0.62468193       0.5962963
+
+
+```{r}
+# d. tune on polynomial
+cost_range = c(.01, .02, .03, .05, .2, .4, .7, 1,2,3,4,5,6,7,8,9,10)
+set.seed(35)
+tune.out = tune(svm, Purchase~., data=OJ.train, kernel="polynomial", degree=2, ranges=list(cost=cost_range))
+summary(tune.out)
+
+```
+From the results we can say that the optimal results are achieved when cost=9. We get error: 0.16875
+
+```{r}
+# e. training and test error rates using best model
+bestmod =tune.out$best.model
+summary (bestmod )
+
+# Training Error
+pred.train = predict(bestmod, newdata=OJ.train)
+table(pred=pred.train, truth=OJ.train$Purchase)
+cm=confusionMatrix(data = pred.train, reference = OJ.train$Purchase)
+cm$byClass
+mean(pred.train == OJ.train$Purchase)
+
+# Test Error
+pred.test = predict(bestmod,newdata=OJ.test)
+table(pred=pred.test, truth=OJ.test$Purchase)
+cm=confusionMatrix(data = pred.test, reference = OJ.test$Purchase)
+cm$byClass
+mean(pred.test == OJ.test$Purchase)
+```
+In summary we see the following results for bestmodel that uses radial kernel:
+
+                Training        Test
+Mean            0.855           0.8037037
+Sensitivity     0.9146341       0.9378882
+Specificity     0.7597403       0.6055046
+Precision       0.8587786       0.7783505
+
 ## (h) Overall, which approach seems to give the best results on this data?
 
+We will compare the test data metrics for the best models retrieved from linear, radial and polynomial kernels.
+
+                Test 				  Test			  Test
+				        (poly, deg:2)	Radial			Linear
+Mean            0.8037037			0.8074074		0.8111111
+Sensitivity     0.9378882			0.9130435		0.9068323
+Specificity     0.6055046			0.6513761		0.6697248
+Precision       0.7783505			0.7945946		0.8021978
+CV Error		    0.16875				0.1625			0.16
+
+We get the best mean/precision and specificity with linear kernel. The sensitivity is highest for the polynomial (degree=2) kernel. The CV error is only slightly better for the linear model.
