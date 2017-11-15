@@ -1,0 +1,124 @@
+---
+title: "Stat 897 Fall 2017 Data Analysis Assignment 11"
+author: "Penn State"
+date: "Due November 19, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this assignment we will use the OJ data found in the ISLR library.
+
+```{r}
+library(ISLR)
+library (tree)
+
+data("OJ")
+str(OJ)
+```
+
+## (a) Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations. This is already done. You can use the same sets from Assignment 10.
+
+```{r}
+set.seed(35)
+train=sample(nrow(OJ),800)
+OJ.train = OJ[train,]
+OJ.test = OJ[-train,]
+```
+
+## (b) Fit a tree to the training data, with Purchase as the response and the other variables except for Buy as predictors. Use the summary() function to produce summary statistics about the tree, and describe the results obtained. What is the training error rate? How many terminal nodes does the tree have?
+
+```{r}
+# there is no parameter called Buy
+dtree <- tree(Purchase ~ ., data = OJ.train)
+summary(dtree)
+```
+
+The tree has the following characteristics:
+- 9 terminal nodes
+- Training error rate of 0.14 (112/800)
+
+## (c) Type in the name of the tree object in order to get a detailed text output. Pick one of the terminal nodes, and interpret the information displayed.
+
+```{r}
+dtree
+```
+Node label: 20, terminal node, split: SpecialCH < 0.5, 
+Number of observations: 77   
+Deviance: 81.30 
+Prediction: MM (22% have CH while the remaining almost 78% have MM)
+
+## (d) Create a plot of the tree, and interpret the results.
+
+```{r}
+plot(dtree)
+text(dtree, pretty = 0)
+```
+
+The most important predictor is LoyalCH. The other lesser important predictors are: "PriceDiff"     "SpecialCH"     "ListPriceDiff"
+
+LoyalCH is the most important and we see that most scenarios for LoyalCH < 0.482304 the prediction is MM whereas for most scenarios for LoyalCH >= 0.482304 the prediction is CH.
+
+Predictor ListPriceDiff is important for the case where 0.482304 <= LoyalCH < 0.753545
+On the other hand SpecialCH is important when 0.276142 < LoyalCH < 0.482304
+
+## (e) Predict the response on the test data, and produce a confusion matrix comparing the test labels to the predicted test labels. What is the test error rate?
+
+```{r}
+dtree.pred <- predict(dtree, OJ.test, type = "class")
+table(dtree.pred, OJ.test$Purchase)
+
+1-(143+73)/(143+73+18+36)
+```
+Test error rate: 20%
+
+## (f) Apply the cv.tree() function to the training set in order to determine the optimal tree size.
+
+```{r}
+set.seed(1)
+cv.dtree <- cv.tree(dtree, FUN = prune.misclass)
+cv.dtree
+```
+The optimal tree size = 2
+
+## (g) Produce a plot with tree size on the x-axis and cross-validated classification error rate on the y-axis.
+```{r}
+plot(cv.dtree$size, cv.dtree$dev, type = "b", xlab = "Tree size", ylab = "Cross-validated classification error rate")
+```
+
+## (h) Which tree size corresponds to the lowest cross-validated classification error rate?
+
+Tree size of 2 corresponds to the lowest cross-validated classification error rate.
+
+## (i) Produce a pruned tree corresponding to the optimal tree size obtained using cross-validation. If cross-validation does not lead to selection of a pruned tree, then create a pruned tree with five terminal nodes.
+
+```{r}
+prune.dtree <- prune.misclass(dtree, best = 2)
+plot(prune.dtree)
+text(prune.dtree, pretty = 0)
+```
+
+Plot also indicates clearly that tree size of 2 corresponds to the lowest cross-validated classification error rate.
+
+## (j) Compare the training error rates between the pruned and unpruned trees. Which is higher?
+
+```{r}
+summary(dtree)
+summary(prune.dtree)
+```
+
+For the training data we find that error rate is slightly higher for the pruned tree (0.185 > 0.14) 
+
+## (k) Compare the test error rates between the pruned and unpruned trees. Which is higher?
+
+```{r}
+prune.dtree.pred <- predict(prune.dtree, OJ.test, type = "class")
+table(prune.dtree.pred, OJ.test$Purchase)
+1-(140+74)/(140+74+21+35)
+
+```
+The test error rate = 20.74%
+
+With full tree we had got test error rate of 20% and with pruned tree we get a very slight increase of 0.74%. The interpretability of the simple 2 node tree is much greater than the full tree.
