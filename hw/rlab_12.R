@@ -82,3 +82,10 @@ plot(hc.out , labels =nci.labs)
 abline (h=139, col =" red ")
 hc.out
 
+set.seed (2)
+km.out =kmeans (sd.data , 4, nstart =20)
+km.clusters =km.out$cluster
+table(km.clusters ,hc.clusters )
+
+table(km.clusters,nci.labs)
+
