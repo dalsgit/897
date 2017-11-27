@@ -11,20 +11,280 @@ knitr::opts_chunk$set(echo = TRUE)
 
 In this assignment we will use the `NCI60` data found in the `ISLR` library. 
 
+```{r}
+library(ISLR)
+library(fpc)
+
+nci.labs = NCI60$labs  #labels - for checking later
+nci.data = NCI60$data
+
+sd.data=scale(nci.data)
+# euclidean distance
+data.dist=dist(sd.data)
+```
+
 ## (a) Run k-means clustering on the data using k = 3. Next, use the elbow method to choose an optimal number of clusters (based on total within sums of squares). Is there a clear choice? What is a potential way to choose the optimal k when the elbow is visually ambiguous? (Note: this is an open-ended question. I'm not looking for a specific answer, but for you to use your intuition.)
+
+```{r}
+set.seed(5)
+km.3.orig = kmeans(sd.data, 3, nstart=100)
+
+# Plot results
+plot(sd.data, col =(km.3.orig$cluster +1) , main="K-Means result with 3 clusters", pch=20, 
+     cex=2)
+
+nc = nrow(nci.data)-1
+wss <- rep(0,nc)
+
+set.seed(5)
+for (i in 1:nc) wss[i] <- sum(kmeans(sd.data,
+                                       centers=i)$withinss)
+plot(1:nc, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares",
+     pch=20, cex=2)
+
+```
+
+There is no clear choice and this speaks to the problem of the elbow/scree plots as it relates to finding a relatively sharp break/turn - this requires subjectivity and ambiguity, especially where there are either no clear breaks or two or more apparent breaks.
+In our plot we see a constant descent and there is no clear elbow formation. Maybe in this case we can rely on a relatively higher jump in parameter reduction before it starts to decrease at a more or less similar rate. For instance in our plot we see that there is a jump in the reduction of wss as we go from 8 to 9 clusters. After this the reduction is at a more or less similar rate.
+
+Let's go with a preferred selection of 9 clusters for the subsequent steps.
 
 ## (b) Tabulate the clusters for k = 3 against the clusters using your optimal k. What do you observe?
 
+```{r}
+set.seed(5)
+km.9.orig = kmeans(sd.data, 9, nstart=100)
+
+# Plot results
+plot(nci.data, col =(km.3.orig$cluster +1) , main="K-Means result with 3 clusters", 
+     pch=20, cex=2)
+
+plot(nci.data, col =(km.9.orig$cluster +1) , main="K-Means result with 9 clusters", 
+     pch=20, cex=2)
+
+table(km.3.orig$cluster, km.9.orig$cluster)
+table(km.3.orig$cluster, nci.labs)
+table(km.9.orig$cluster, nci.labs)
+
+sapply(list(kmeans_3 = km.3.orig$cluster, kmeans_9 = km.9.orig$cluster),
+    function(c) cluster.stats(data.dist, c)[c("within.cluster.ss")])
+
+```
+
+We see the following results
+- Cluster 3 of 3-cluster and cluster 5 of 9-cluster match (2 Breast, 7 Melanoma)
+
+- 3-cluster has most of its elements in cluster 1 (35 out of 64). 9-cluster is more balanced.
+
+- None of the others cluster match. Cluster 1 and 2 in 3-cluster has 35 and 20 elements. The second 9-cluster breaks those into many new clusters
+
+- 3-cluster configuration
+withinss: 201441.0 127760.0  37149.6
+Total withinss: 366350.6
+
+- 9-cluster configuration
+withinss: 13817.715 87504.903 64637.753  3364.531 37149.601 10326.094 28944.928  3605.765 29955.611
+Total withinss: 279306.9
+
+- 9-cluster has a much less withinss than the 3-cluster
+
 ## (c) Now perform hierarchical clustering using both single and complete clustering. Plot the dendograms.
+
+```{r}
+hc.complete.orig=hclust(data.dist, method="complete")
+hc.single.orig=hclust(data.dist, method="single")
+
+plot(hc.complete.orig, labels = nci.labs, main = "Complete Linkage", xlab = "", 
+    sub = "", ylab = "")  
+
+plot(hc.single.orig, labels = nci.labs, main = "Single Linkage", 
+    xlab = "", sub = "", ylab = "")
+```
+We see that the complete linkage is giving us a more balanced cluster. Single linkage as expected tends to yield extended clusters to which single leaves are fused one by one. 
 
 ## (d) Cut the trees to obtain the number of clusters you found optimal for kmeans. Tabulate the clusters for both single and complete versus the kmeans clusters. What do you observe? Based on the dendograms, does cutting the trees at this point make sense?
 
+```{r}
+
+hc.complete.orig.clusters = cutree(hc.complete.orig, 9)
+hc.single.orig.clusters =cutree(hc.single.orig, 9)
+
+table(hc.complete.orig.clusters, km.9.orig$cluster)
+table(hc.single.orig.clusters, km.9.orig$cluster)
+
+table(hc.complete.orig.clusters, nci.labs)
+table(hc.single.orig.clusters, nci.labs)
+table(km.9.orig$cluster, nci.labs)
+
+plot(hc.complete.orig, labels = nci.labs)
+rect.hclust(hc.complete.orig, k=9, border="red")
+
+plot(hc.single.orig, labels = nci.labs)
+rect.hclust(hc.single.orig, k=9, border="red")
+
+sapply(list(kmeans_9 = km.9.orig$cluster, hc_single_9 = hc.single.orig.clusters, 
+            hc_complete_9 = hc.complete.orig.clusters),
+    function(c) cluster.stats(data.dist, c)[c("within.cluster.ss")])
+```
+Compare 9 cut hierarchical cluster (complete) and k-means 9-cluster
+- 9-hc-complete has most of the data elements in cluster 1 (31 / 64)
+- Cluster results don't match with the k-means 9-cluster output
+
+Compare 9 cut hierarchical cluster (single) and k-means 9-cluster
+- 9-hc-single has most of the data elements in cluster 1 (52/64)
+- The clusters dont match 
+- The 9-hc-single is very unbalanced.  
+
+In summary for both the hierarchical clusters we see that one cluster has most of the elements. This doesn't seem to be an appropriate cut. The problem is more severe when using single linkage. The k-means within cluster ss is the lowest.
+
 ## (e) Repeat parts (c) and (d) using a different distance measure (than euclidean). Give a reason for your choice. What differences (if any) do you see when you tabulate the results?
+
+We will try Correlation-based distance. This might work better because of the following rationale:
+Correlation-based distance considers two observations to be similar if their features are highly correlated, even though the observed values may be far apart in terms of Euclidean distance. In this use-case when correlation-based distance is used, then genes with similar values (e.g. gene A and B has same value for Leukemia, Renal cancer) will be clustered together. Therefore, for this application, correlation-based distance may be a better choice.
+
+```{r}
+# Though part c doesn't have k-means, 
+# doing this here to see if anything changes with k-means
+data.dist.cor=as.dist(1- cor(t(nci.data)))
+
+set.seed(5)
+km.9.cor.orig = kmeans(data.dist.cor, 9, nstart=100)
+table(km.9.orig$cluster, km.9.cor.orig$cluster)
+
+table(km.9.orig$cluster, nci.labs)
+table(km.9.cor.orig$cluster, nci.labs)
+
+km.9.cor.orig$tot.withinss
+```
+Observations:
+- The clusters are different (few similarities) but the distributions seem to be similar.
+- All cases of leukemia fall in a single cluster when using corelation based distance. In the case of 
+euclidean that is not the case. Same applies to CNS, COLON.
+- Overall since we see higher proportion of one type of cancers falling into a single cluster, we can say that we see slightly better performance when using corelation based distance in the k-means procedure.
+- There is a huge reduction in the total within ss - this is desirable 
+
+Hierarchical clustering:
+
+```{r}
+set.seed(5)
+hc.complete.cor.orig=hclust(data.dist.cor, method="complete")
+hc.single.cor.orig=hclust(data.dist.cor, method="single")
+
+plot(hc.complete.cor.orig, labels = nci.labs, main = "Complete Linkage", xlab = "", 
+    sub = "", ylab = "")  
+rect.hclust(hc.complete.cor.orig, k=9, border="red")
+
+plot(hc.single.cor.orig, labels = nci.labs, main = "Single Linkage", 
+    xlab = "", sub = "", ylab = "")
+rect.hclust(hc.single.cor.orig, k=9, border="red")
+
+hc.complete.cor.orig.clusters = cutree(hc.complete.cor.orig, 9)
+hc.single.cor.orig.clusters =cutree(hc.single.cor.orig, 9)
+
+table(hc.complete.cor.orig.clusters, km.9.cor.orig$cluster)
+table(hc.single.cor.orig.clusters, km.9.cor.orig$cluster)
+
+table(hc.complete.cor.orig.clusters, nci.labs)
+table(hc.single.cor.orig.clusters, nci.labs)
+
+sapply(list(kmeans_9_cor = km.9.cor.orig$cluster, 
+            hc_single_9_cor = hc.single.cor.orig.clusters, 
+            hc_complete_9_cor = hc.complete.cor.orig.clusters),
+    function(c) cluster.stats(data.dist.cor, c)[c("within.cluster.ss")])
+
+```
+We make the following observations:
+- Complete linkage provides a much more balanced tree.
+- Single linkage is not balanced and tends to yield extended clusters to which single leaves are fused one by one.
+- Single linkage leads to a tree that has almost all the data in 2 clusters and remaining clusters are scarcely populated.
+- In summary the 9 size tree seems relatively more appropriate for the complete linkage tree. The single linkage leads to an inappropriate tree.
+- Lowest within cluster ss is for kmeans followed by complete linkage.
 
 ## (f) Using PCA, pull out a number of principal components for the `NCI60` data. Explain your choice of number of PCs.
 
+```{r}
+pr.out = prcomp(nci.data, scale = T)
+summary(pr.out)
+plot(pr.out)
+
+pve = 100 * pr.out$sdev^2/sum(pr.out$sdev^2)
+plot(pve, type = "o", ylab = "PVE", xlab = "Principal Component", col = "blue")
+```
+We see an elbow at about 8 components - at that level we have explained 41.2% of variance. This doesn't seem too much but the plot and the table indicates that the remaining components have lower marginal contribution to the overall variance. 
+
 ## (g) Using these PCs, repeat kmeans clustering and hierarchical clustering (with your preferred distance function and both linkage methods). Compare the results to the results for the corresponding method on the original data.
+
+We will use corelation based distance.
+
+K-Means
+```{r}
+data.dist.pc.cor=as.dist(1- cor(t(pr.out$x[, 1:8])))
+
+set.seed(5)
+km.9.cor.pca = kmeans(data.dist.pc.cor, 9, nstart=100)
+km.9.cor.pca$tot.withinss
+
+table(km.9.cor.orig$cluster, km.9.cor.pca$cluster)
+
+table(km.9.cor.orig$cluster, nci.labs)
+table(km.9.cor.pca$cluster, nci.labs)
+
+km.9.cor.pca$tot.withinss
+```
+
+Observations:
+- 9-kmeans-cor-orig-cluster cluster # 2 is same as 9-kmeans-cor-pca-cluster cluster # 9 (Breast:2, MCF7A-repro:1, MCF7D-repro:1)
+- Most clusters are different (few similarities) but the distributions seem to be similar.
+- We see that the total within ss increases from the kmeans cluster we got with all the data when using corelation based distance. However it is much lower than the values that we obtained with euclidean distance and using the original data.
+
+Hierarchical clustering:
+
+```{r}
+set.seed(5)
+hc.complete.cor.pca=hclust(data.dist.pc.cor, method="complete")
+hc.single.cor.pca=hclust(data.dist.pc.cor, method="single")
+
+plot(hc.complete.cor.pca, labels = nci.labs, main = "Complete Linkage", xlab = "", 
+    sub = "", ylab = "")  
+rect.hclust(hc.complete.cor.pca, k=9, border="red")
+
+plot(hc.single.cor.pca, labels = nci.labs, main = "Single Linkage", 
+    xlab = "", sub = "", ylab = "")
+rect.hclust(hc.single.cor.pca, k=9, border="red")
+
+hc.complete.cor.pca.clusters = cutree(hc.complete.cor.pca, 9)
+hc.single.cor.pca.clusters =cutree(hc.single.cor.pca, 9)
+
+table(hc.complete.cor.pca.clusters, km.9.cor.pca$cluster)
+table(hc.single.cor.pca.clusters, km.9.cor.pca$cluster)
+
+table(hc.complete.cor.pca.clusters, nci.labs)
+table(hc.single.cor.pca.clusters, nci.labs)
+
+table(hc.complete.cor.pca.clusters, hc.complete.cor.orig.clusters)
+
+
+sapply(list(kmeans_9_cor.pca = km.9.cor.pca$cluster, 
+            hc_single_9_cor_pca = hc.single.cor.pca.clusters, 
+            hc_complete_9_cor_pca = hc.complete.cor.pca.clusters),
+    function(c) cluster.stats(data.dist.pc.cor, c)[c("within.cluster.ss")])
+```
+We make the following observations:
+- Complete linkage provides a balanced tree.
+- Though single linkage is not as balanced as complete linkage, it is much better than the previous iteration of single linkage with original data. So there is improvement.
+- The complete linkage clusters with original and PCA data (both using corelation based distance) are similar though visually the PCA looks better and also gives lower within cluster ss.
 
 ## (h) For which method(s) do you observe a substantial change in the clusters based on the original data versus the PC? Which method(s) don't change as much?
 
+
+The summary of results:
+- K-Means with 9-clusters, PCA, cor distance (IS ALMOST SAME AS BUT NOT AS GOOD AS) K-Means with 9-clusters, original, cor distance  
+  
+- K-Means with 9-clusters, PCA, cor distance (IS MUCH BETTER THAN) K-Means with 9-clusters, original, euclidean distance  
+  
+- Hierchical with complete linkage, 9-clusters, PCA, cor distance (IS ALMOST SAME AS) Hierchical with complete linkage, 9-clusters, original, cor distance  
+  
+- Hierchical with single linkage, 9-clusters, PCA, cor distance (IS BETTER THAN) Hierchical with single linkage, 9-clusters, original, cor distance  
+  
 
